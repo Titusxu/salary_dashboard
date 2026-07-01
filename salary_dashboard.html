@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Titus · Salary Analysis</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js">
+</script>
+<script>
+Chart.defaults.elements.point.borderWidth = 0;
+Chart.defaults.elements.point.radius = 3;
+</script>
+<style>
+:root {
+  --bg-base: #050812;
+  --glass-bg: rgba(255,255,255,0.04);
+  --glass-bg-hover: rgba(255,255,255,0.08);
+  --glass-border: rgba(255,255,255,0.08);
+  --glass-border-hover: rgba(255,255,255,0.16);
+  --text: #e8ecf1;
+  --text-secondary: #8b95a5;
+  --text-muted: #5a6475;
+  --accent: #60a5fa;
+  --green: #22c55e;
+  --red: #ef4444;
+  --orange: #f59e0b;
+  --purple: #a855f7;
+  --teal: #14b8a6;
+  --pink: #ec4899;
+  --radius: 16px;
+  --transition: 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-base);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ===== INTERACTIVE GLOW CANVAS ===== */
+#glowCanvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ===== ANIMATED ORBS (ambient) ===== */
+.bg-orbs {position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+.orb{
+  position:absolute;border-radius:50%;
+  filter:blur(120px);opacity:0.12;
+  animation:orbFloat 20s ease-in-out infinite;
+}
+.orb-1{width:600px;height:600px;background:var(--accent);top:-200px;left:-150px;animation-delay:0s;}
+.orb-2{width:500px;height:500px;background:var(--purple);bottom:-150px;right:-100px;animation-delay:-7s;}
+.orb-3{width:400px;height:400px;background:var(--teal);top:50%;left:50%;animation-delay:-14s;}
+@keyframes orbFloat{
+  0%,100%{transform:translate(0,0) scale(1)}
+  25%{transform:translate(80px,-60px) scale(1.08)}
+  50%{transform:translate(-40px,40px) scale(0.95)}
+  75%{transform:translate(-60px,-30px) scale(1.05)}
+}
+
+/* ===== HEADER ===== */
+.header{
+  position:sticky;top:0;z-index:100;
+  background:rgba(10,14,24,0.75);
+  backdrop-filter:blur(30px) saturate(180%);
+  -webkit-backdrop-filter:blur(30px) saturate(180%);
+  border-bottom:1px solid var(--glass-border);
+  padding:16px 32px;
+}
+.header-inner{
+  max-width:1480px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;
+}
+.header h1{
+  font-size:22px;font-weight:800;letter-spacing:-0.3px;
+  background:linear-gradient(135deg,#60a5fa 0%,#a78bfa 50%,#22c55e 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.header-actions{display:flex;gap:10px;align-items:center;}
+.header-btn{
+  padding:8px 16px;border-radius:20px;font-size:12px;font-weight:600;
+  cursor:pointer;border:1px solid var(--glass-border);
+  background:var(--glass-bg);color:var(--text-secondary);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  transition:all var(--transition);display:flex;align-items:center;gap:6px;user-select:none;
+}
+.header-btn:hover{background:var(--glass-bg-hover);border-color:var(--glass-border-hover);color:var(--text);}
+.header-badge{
+  font-size:10px;padding:2px 8px;border-radius:10px;
+  background:rgba(34,197,94,0.15);color:var(--green);font-weight:700;
+}
+
+/* ===== CONTAINER ===== */
+.container{max-width:1480px;margin:0 auto;padding:24px 32px 60px;position:relative;z-index:1;}
+
+/* ===== TAB NAV ===== */
+.tab-nav{
+  display:flex;gap:6px;margin-bottom:24px;
+  padding:4px;border-radius:14px;
+  background:var(--glass-bg);border:1px solid var(--glass-border);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  width:fit-content;
+}
+.tab-btn{
+  padding:10px 22px;border-radius:11px;font-size:13px;font-weight:700;
+  cursor:pointer;border:none;background:transparent;color:var(--text-secondary);
+  transition:all var(--transition);user-select:none;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{
+  background:rgba(255,255,255,0.1);color:#fff;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+}
+.tab-content{display:none;animation:fadeSlideIn 0.4s ease;}
+.tab-content.active{display:block;}
+@keyframes fadeSlideIn{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
+/* ===== KPI ===== */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
+.kpi-card{
+  padding:20px 22px;border-radius:var(--radius);
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid var(--glass-border);
+  transition:all var(--transition);
+  position:relative;overflow:hidden;cursor:pointer;
+}
+.kpi-card:hover{
+  background:var(--glass-bg-hover);
+  border-color:var(--glass-border-hover);
+  transform:translateY(-3px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+.kpi-card::before{
+  content:'';position:absolute;top:0;left:0;width:100%;height:2px;
+  opacity:0;transition:opacity var(--transition);
+}
+.kpi-card:hover::before{opacity:1;}
+.kpi-card.blue::before{background:linear-gradient(90deg,transparent,var(--accent),transparent);}
+.kpi-card.green::before{background:linear-gradient(90deg,transparent,var(--green),transparent);}
+.kpi-card.orange::before{background:linear-gradient(90deg,transparent,var(--orange),transparent);}
+.kpi-card.purple::before{background:linear-gradient(90deg,transparent,var(--purple),transparent);}
+.kpi-card.teal::before{background:linear-gradient(90deg,transparent,var(--teal),transparent);}
+.kpi-icon{
+  width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  margin-bottom:12px;font-size:14px;
+}
+.kpi-card.blue .kpi-icon{background:rgba(59,130,246,0.15);color:var(--accent);}
+.kpi-card.green .kpi-icon{background:rgba(34,197,94,0.15);color:var(--green);}
+.kpi-card.orange .kpi-icon{background:rgba(245,158,11,0.15);color:var(--orange);}
+.kpi-card.purple .kpi-icon{background:rgba(168,85,247,0.15);color:var(--purple);}
+.kpi-card.teal .kpi-icon{background:rgba(20,184,166,0.15);color:var(--teal);}
+.kpi-label{font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;}
+.kpi-value{
+  font-size:30px;font-weight:800;letter-spacing:-1px;
+  font-variant-numeric:tabular-nums;margin:4px 0;
+  transition:all 0.5s ease;
+}
+.kpi-sub{font-size:11px;color:var(--text-muted);}
+.kpi-trend{font-size:11px;font-weight:700;margin-top:4px;}
+
+/* ===== CHARTS ===== */
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+.charts-3col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px;}
+.chart-card{
+  padding:22px;border-radius:var(--radius);
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid var(--glass-border);
+  transition:all var(--transition);
+}
+.chart-card:hover{border-color:var(--glass-border-hover);}
+.chart-card.wide{grid-column:span 2;}
+.chart-card.full{grid-column:span 3;}
+.chart-title{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.chart-title .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.chart-wrapper{position:relative;width:100%;height:320px;}
+.chart-wrapper.tall{height:380px;}
+.chart-wrapper.short{height:260px;}
+
+/* ===== TABLE ===== */
+.table-card{
+  padding:22px;border-radius:var(--radius);
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid var(--glass-border);
+}
+.table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.table-search{
+  padding:8px 16px;border-radius:10px;font-size:12px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);
+  color:var(--text);width:220px;outline:none;
+  transition:border-color var(--transition);
+}
+.table-search:focus{border-color:var(--accent);}
+.table-search::placeholder{color:var(--text-muted);}
+.table-wrap{overflow-x:auto;max-height:500px;overflow-y:auto;border-radius:10px;}
+table{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;}
+thead{position:sticky;top:0;z-index:5;}
+th{
+  padding:10px 12px;text-align:right;font-weight:700;color:var(--text-muted);white-space:nowrap;
+  border-bottom:1px solid var(--glass-border);
+  background:rgba(15,20,35,0.9);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;
+}
+th:first-child{text-align:center;}
+td{
+  padding:9px 12px;text-align:right;white-space:nowrap;
+  border-bottom:1px solid rgba(255,255,255,0.03);
+  transition:background 0.15s;
+}
+td:first-child{text-align:center;font-weight:600;color:var(--text-secondary);}
+tr:hover td{background:rgba(255,255,255,0.03);}
+.net-value{color:var(--green);font-weight:700;}
+.tax-value{color:var(--orange);}
+.level-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;background:rgba(59,130,246,0.15);color:var(--accent);}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:10px;}
+::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,0.2);}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+  padding:10px 24px;border-radius:20px;
+  background:rgba(255,255,255,0.1);backdrop-filter:blur(20px);
+  border:1px solid var(--glass-border);color:var(--text);
+  font-size:12px;font-weight:600;z-index:999;
+  animation:toastIn 0.3s ease,toastOut 0.3s ease 2s forwards;
+  pointer-events:none;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+
+/* ===== YEAR PILLS & DATA GRID (构成 tab) ===== */
+.year-pills {
+  display: flex; gap: 6px; margin-bottom: 18px;
+}
+.yr-pill {
+  padding: 7px 20px; border-radius: 20px; font-size: 13px; font-weight: 700;
+  cursor: pointer; border: 1px solid var(--glass-border);
+  background: var(--glass-bg); color: var(--text-secondary);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  transition: all var(--transition); user-select: none;
+}
+.yr-pill:hover { background: var(--glass-bg-hover); border-color: var(--glass-border-hover); color: var(--text); }
+.yr-pill.active {
+  background: linear-gradient(135deg, rgba(96,165,250,0.25), rgba(167,139,250,0.25));
+  border-color: rgba(96,165,250,0.5);
+  color: #fff;
+  box-shadow: 0 0 16px rgba(96,165,250,0.15);
+}
+.year-data-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+}
+.data-col-title {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--glass-border);
+}
+.data-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; border-radius: 8px;
+  transition: background 0.15s;
+}
+.data-row:hover { background: rgba(255,255,255,0.03); }
+.data-row.total {
+  margin-top: 6px; padding-top: 10px;
+  border-top: 1px solid var(--glass-border);
+  font-weight: 700;
+}
+.data-label { font-size: 12px; color: var(--text-secondary); }
+.data-vals { display: flex; gap: 20px; align-items: center; }
+.data-val {
+  font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--text); min-width: 80px; text-align: right;
+}
+.data-avg {
+  font-size: 11px; color: var(--text-muted); min-width: 70px; text-align: right;
+}
+.data-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700;
+}
+.data-tag.income { background: rgba(96,165,250,0.15); color: var(--accent); }
+.data-tag.net { background: rgba(34,197,94,0.15); color: var(--green); }
+.data-tag.ded { background: rgba(239,68,68,0.12); color: var(--red); }
+
+/* Responsive */
+@media(max-width:1200px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr);}
+  .charts-3col{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:768px){
+  .container{padding:16px;}
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .charts-grid,.charts-3col{grid-template-columns:1fr;}
+  .chart-card.wide,.chart-card.full{grid-column:span 1;}
+  .header{padding:12px 16px;}
+  .tab-nav{overflow-x:auto;width:100%;}
+}
+@media(max-width:480px){
+  .kpi-grid{grid-template-columns:1fr;}
+  .header h1{font-size:18px;}
+}
+</style>
+</head>
+<body>
+
+<canvas id="glowCanvas"></canvas>
+
+<div class="bg-orbs">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+
+<div class="header">
+  <div class="header-inner">
+    <h1>Titus · Salary Analysis</h1>
+    <div class="header-actions">
+      <span class="header-badge">42个月</span>
+      <button class="header-btn" onclick="exportData()">📤 导出</button>
+      <button class="header-btn" onclick="toggleFullscreen()">⛶ 全屏</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<div class="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('overview',this)">📊 总览</button>
+  <button class="tab-btn" onclick="switchTab('trends',this)">📈 趋势</button>
+  <button class="tab-btn" onclick="switchTab('composition',this)">📊 构成</button>
+  <button class="tab-btn" onclick="switchTab('breakdown',this)">📋 明细</button>
+</div>
+
+<!-- TAB: Overview -->
+<div class="tab-content active" id="tab-overview">
+  <div class="kpi-grid">
+    <div class="kpi-card blue" onclick="flashKPI(this)">
+      <div class="kpi-icon">💰</div>
+      <div class="kpi-label">累计总收入</div>
+      <div class="kpi-value" id="kpi-income">¥981,812</div>
+      <div class="kpi-sub">月均 ¥23,376</div>
+      <div class="kpi-trend" style="color:var(--red)">↑ 年度复合增长 15.4%</div>
+    </div>
+    <div class="kpi-card green" onclick="flashKPI(this)">
+      <div class="kpi-icon">✅</div>
+      <div class="kpi-label">累计实发金额</div>
+      <div class="kpi-value" id="kpi-net">¥771,206</div>
+      <div class="kpi-sub">月均 ¥18,362</div>
+      <div class="kpi-trend" style="color:var(--red)">到账率 78.5%</div>
+    </div>
+    <div class="kpi-card orange" onclick="flashKPI(this)">
+      <div class="kpi-icon">📉</div>
+      <div class="kpi-label">累计总扣除</div>
+      <div class="kpi-value" id="kpi-ded">¥210,606</div>
+      <div class="kpi-sub">综合税负率 21.5%</div>
+    </div>
+    <div class="kpi-card purple" onclick="flashKPI(this)">
+      <div class="kpi-icon">🏛</div>
+      <div class="kpi-label">累计个税</div>
+      <div class="kpi-value" id="kpi-tax">¥66,670</div>
+      <div class="kpi-sub">占比收入 6.8%</div>
+    </div>
+    <div class="kpi-card teal" onclick="flashKPI(this)">
+      <div class="kpi-icon">🛡</div>
+      <div class="kpi-label">社保公积金累计</div>
+      <div class="kpi-value" id="kpi-social">¥143,936</div>
+      <div class="kpi-sub">占比收入 14.7%</div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card wide">
+      <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>月度收入 · 实发 · 扣除趋势</div>
+      <div class="chart-wrapper tall"><canvas id="chartMainTrend"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--purple)"></span>年度实发金额对比</div>
+      <div class="chart-wrapper"><canvas id="chartYearBar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--teal)"></span>累计实发增长曲线</div>
+      <div class="chart-wrapper"><canvas id="chartCumulative"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: Trends -->
+<div class="tab-content" id="tab-trends">
+  <div class="charts-grid">
+    <div class="chart-card wide">
+      <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>月度净收入 vs 年度平均值 (涨红跌绿)</div>
+      <div class="chart-wrapper tall"><canvas id="chartMoM"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--orange)"></span>实际税负率月度趋势</div>
+      <div class="chart-wrapper"><canvas id="chartTaxRate"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--green)"></span>净收入率趋势 (实发/总收入)</div>
+      <div class="chart-wrapper"><canvas id="chartNetRate"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card wide">
+      <div class="chart-title"><span class="dot" style="background:var(--purple)"></span>年度各月同比对比</div>
+      <div class="chart-wrapper tall"><canvas id="chartYoY"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: Composition -->
+<div class="tab-content" id="tab-composition">
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>整体收入构成</div>
+      <div class="chart-wrapper" style="height:340px"><canvas id="chartIncomeDonut"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--orange)"></span>扣除构成分析</div>
+      <div class="chart-wrapper" style="height:280px"><canvas id="chartDedDonut"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--purple)"></span>各年度收入构成对比</div>
+      <div class="chart-wrapper tall"><canvas id="chartYearStack"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--teal)"></span>季度收入趋势</div>
+      <div class="chart-wrapper tall"><canvas id="chartQuarterly"></canvas></div>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card full">
+      <div class="chart-title"><span class="dot" style="background:var(--green)"></span>年度薪资明细数据</div>
+      <div class="year-pills">
+        <button class="yr-pill active" onclick="switchYearNum(2023,this)">2023 年</button>
+        <button class="yr-pill" onclick="switchYearNum(2024,this)">2024 年</button>
+        <button class="yr-pill" onclick="switchYearNum(2025,this)">2025 年</button>
+        <button class="yr-pill" onclick="switchYearNum(2026,this)">2026 年</button>
+      </div>
+      <div class="year-data-grid" id="yearDataGrid">
+        <div class="data-col-title" style="grid-column:span 2;text-align:center;color:var(--text-secondary);font-size:13px;">
+          点击上方年份标签查看详细数据
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB: Breakdown -->
+<div class="tab-content" id="tab-breakdown">
+  <div class="charts-3col">
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--accent)"></span>月度扣除明细 (个税+社保公积金)</div>
+      <div class="chart-wrapper"><canvas id="chartDedStack"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--pink)"></span>职级晋升时间线 & 收入跃迁</div>
+      <div class="chart-wrapper"><canvas id="chartLevel"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--green)"></span>收入分布直方图</div>
+      <div class="chart-wrapper"><canvas id="chartHistogram"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--orange)"></span>月度个税实际税负率</div>
+      <div class="chart-wrapper"><canvas id="chartIITMonthly"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--purple)"></span>奖金/补贴季节性热力</div>
+      <div class="chart-wrapper"><canvas id="chartBonusHeat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title"><span class="dot" style="background:var(--orange)"></span>月度收入弹性分析</div>
+      <div class="chart-wrapper"><canvas id="chartElasticity"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <div class="chart-title"><span class="dot" style="background:#fbbf24"></span>全部月度数据明细</div>
+      <input type="text" class="table-search" placeholder="🔍 搜索年份/月份/职级..." oninput="filterTable(this.value)">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>期间</th><th>职级</th>
+            <th>基本工资</th><th>职级奖</th><th>绩效奖</th><th>销售奖金</th>
+            <th>加班费</th><th>补贴</th><th>调整</th><th>总收入</th>
+            <th>个税</th><th>社保公积金</th><th>总扣除</th><th>实发金额</th><th>到手率</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// === DATA_INJECT:SALARY_DATA ===
+var salaryData = [{"y": 2023, "m": 1, "level": "S-10", "foundation": 10657.89, "rankBonus": 0.0, "perfBonus": 0.0, "saleBonus": 0.0, "overtime": 0.0, "areaAllowance": 2842.11, "dutyAllowance": 0.0, "refreshment": 4000.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 17500.0, "iit": 300.17, "pension": 1140.0, "medical": 285.0, "unemployment": 71.3, "housingFund": 998.0, "totalDeduction": 2794.47, "netPay": 14705.53}, {"y": 2023, "m": 2, "level": "S-10", "foundation": 11250.0, "rankBonus": 0.0, "perfBonus": 1457.65, "saleBonus": 1503.0, "overtime": 1457.65, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 17210.65, "iit": 291.49, "pension": 1140.0, "medical": 285.0, "unemployment": 71.3, "housingFund": 998.0, "totalDeduction": 2785.79, "netPay": 14424.86}, {"y": 2023, "m": 3, "level": "S-10", "foundation": 11193.97, "rankBonus": 0.0, "perfBonus": 3724.14, "saleBonus": 2428.84, "overtime": 3724.14, "areaAllowance": 2985.06, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 20332.01, "iit": 385.13, "pension": 1140.0, "medical": 285.0, "unemployment": 71.3, "housingFund": 998.0, "totalDeduction": 2879.43, "netPay": 17452.58}, {"y": 2023, "m": 4, "level": "S-10", "foundation": 10987.07, "rankBonus": 0.0, "perfBonus": 2836.75, "saleBonus": 2066.55, "overtime": 2836.75, "areaAllowance": 2929.88, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 18820.25, "iit": 891.79, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3386.04, "netPay": 15434.21}, {"y": 2023, "m": 5, "level": "S-10", "foundation": 10701.51, "rankBonus": 0.0, "perfBonus": 996.98, "saleBonus": 1687.8, "overtime": 996.98, "areaAllowance": 2646.84, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 230.0, "adjustment": 0.0, "totalIncome": 16263.13, "iit": 1496.26, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3990.51, "netPay": 12272.62}, {"y": 2023, "m": 6, "level": "S-10", "foundation": 11237.07, "rankBonus": 665.95, "perfBonus": 3399.25, "saleBonus": 1889.83, "overtime": 4065.2, "areaAllowance": 2996.55, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 460.0, "adjustment": 0.0, "totalIncome": 20648.65, "iit": 1315.44, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3809.69, "netPay": 16838.96}, {"y": 2023, "m": 7, "level": "S-11", "foundation": 11481.27, "rankBonus": 0.0, "perfBonus": 3423.23, "saleBonus": 1359.78, "overtime": 3423.23, "areaAllowance": 2995.11, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 19259.39, "iit": 1176.52, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3670.77, "netPay": 15588.62}, {"y": 2023, "m": 8, "level": "S-11", "foundation": 11036.25, "rankBonus": 1251.78, "perfBonus": 2817.5, "saleBonus": 1263.59, "overtime": 4069.28, "areaAllowance": 2713.51, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 19082.63, "iit": 1158.84, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3653.09, "netPay": 15429.54}, {"y": 2023, "m": 9, "level": "S-11", "foundation": 11500.0, "rankBonus": 0.0, "perfBonus": 3120.86, "saleBonus": 1925.0, "overtime": 3120.86, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 4000.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 23545.86, "iit": 1605.16, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 4099.41, "netPay": 19446.45}, {"y": 2023, "m": 10, "level": "S-11", "foundation": 11500.0, "rankBonus": 3284.77, "perfBonus": 4492.93, "saleBonus": 1055.0, "overtime": 7777.7, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 23332.7, "iit": 1583.85, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 4078.1, "netPay": 19254.6}, {"y": 2023, "m": 11, "level": "S-12", "foundation": 11485.52, "rankBonus": 752.27, "perfBonus": 5563.02, "saleBonus": 1097.14, "overtime": 6315.29, "areaAllowance": 2849.71, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 722.08, "totalIncome": 22469.74, "iit": 1500.18, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3994.43, "netPay": 18475.31}, {"y": 2023, "m": 12, "level": "S-12", "foundation": 11750.0, "rankBonus": 0.0, "perfBonus": 2473.58, "saleBonus": 1637.0, "overtime": 2473.58, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 18860.58, "iit": 2273.27, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 4767.52, "netPay": 14093.06}, {"y": 2024, "m": 1, "level": "S-12", "foundation": 11750.0, "rankBonus": 0.0, "perfBonus": 2689.33, "saleBonus": 1812.0, "overtime": 2689.33, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 4000.0, "travel": 230.0, "adjustment": 0.0, "totalIncome": 23481.33, "iit": 472.71, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 2966.96, "netPay": 20514.37}, {"y": 2024, "m": 2, "level": "S-12", "foundation": 11422.48, "rankBonus": 0.0, "perfBonus": 2939.53, "saleBonus": 1731.19, "overtime": 2939.53, "areaAllowance": 2792.24, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 18885.44, "iit": 348.64, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 2842.89, "netPay": 16042.55}, {"y": 2024, "m": 3, "level": "S-12", "foundation": 11750.0, "rankBonus": 0.0, "perfBonus": 2888.88, "saleBonus": 1004.0, "overtime": 2888.88, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 2000.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 20642.88, "iit": 711.34, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3205.59, "netPay": 17437.29}, {"y": 2024, "m": 4, "level": "S-12", "foundation": 11750.0, "rankBonus": 0.0, "perfBonus": 3530.06, "saleBonus": 1508.0, "overtime": 3530.06, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 19788.06, "iit": 1229.38, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 3723.63, "netPay": 16064.43}, {"y": 2024, "m": 5, "level": "S-15", "foundation": 12454.5, "rankBonus": 0.0, "perfBonus": 2955.82, "saleBonus": 2097.34, "overtime": 2955.82, "areaAllowance": 2989.08, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 230.0, "adjustment": 1941.33, "totalIncome": 22668.07, "iit": 2940.16, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 5434.41, "netPay": 17233.66}, {"y": 2024, "m": 6, "level": "S-15", "foundation": 12500.0, "rankBonus": 0.0, "perfBonus": 5320.04, "saleBonus": 2151.0, "overtime": 5320.04, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 22971.04, "iit": 1547.68, "pension": 1140.0, "medical": 285.0, "unemployment": 71.25, "housingFund": 998.0, "totalDeduction": 4041.93, "netPay": 18929.11}, {"y": 2024, "m": 7, "level": "S-15", "foundation": 12500.0, "rankBonus": 0.0, "perfBonus": 3741.38, "saleBonus": 1767.0, "overtime": 3741.38, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 230.0, "adjustment": 0.0, "totalIncome": 21238.38, "iit": 1238.51, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 5091.76, "netPay": 16146.62}, {"y": 2024, "m": 8, "level": "S-15", "foundation": 12270.11, "rankBonus": 0.0, "perfBonus": 4275.86, "saleBonus": 2041.61, "overtime": 4275.86, "areaAllowance": 2862.07, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 230.0, "adjustment": 0.0, "totalIncome": 21679.65, "iit": 1282.64, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 5135.89, "netPay": 16543.76}, {"y": 2024, "m": 9, "level": "S-15", "foundation": 12500.0, "rankBonus": 0.0, "perfBonus": 5849.14, "saleBonus": 2039.0, "overtime": 5849.14, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 4000.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 27388.14, "iit": 1853.49, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 5706.74, "netPay": 21681.4}, {"y": 2024, "m": 10, "level": "S-15", "foundation": 12500.0, "rankBonus": 0.0, "perfBonus": 3943.97, "saleBonus": 1401.0, "overtime": 3943.97, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 690.0, "adjustment": 0.0, "totalIncome": 21534.97, "iit": 2395.39, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 6248.64, "netPay": 15286.33}, {"y": 2024, "m": 11, "level": "S-17", "foundation": 12521.84, "rankBonus": 0.0, "perfBonus": 4037.84, "saleBonus": 1444.7, "overtime": 4037.84, "areaAllowance": 2724.14, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 230.0, "adjustment": 1274.75, "totalIncome": 22233.27, "iit": 2676.01, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 6529.26, "netPay": 15704.01}, {"y": 2024, "m": 12, "level": "S-17", "foundation": 13000.0, "rankBonus": 2909.31, "perfBonus": 3900.0, "saleBonus": 2279.0, "overtime": 6809.31, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": -169.18, "totalIncome": 24919.13, "iit": 3213.17, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 7066.42, "netPay": 17852.71}, {"y": 2025, "m": 1, "level": "S-17", "foundation": 12910.34, "rankBonus": 0.0, "perfBonus": 3062.84, "saleBonus": 2473.79, "overtime": 3062.84, "areaAllowance": 2931.03, "dutyAllowance": 0.0, "refreshment": 4000.0, "travel": 920.0, "adjustment": 469.17, "totalIncome": 26767.17, "iit": 537.42, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 4390.67, "netPay": 22376.5}, {"y": 2025, "m": 2, "level": "S-17", "foundation": 13000.0, "rankBonus": 0.0, "perfBonus": 2642.59, "saleBonus": 1806.0, "overtime": 2642.59, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 20448.59, "iit": 347.86, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 4201.11, "netPay": 16247.48}, {"y": 2025, "m": 3, "level": "S-17", "foundation": 13000.0, "rankBonus": 0.0, "perfBonus": 3948.19, "saleBonus": 2128.0, "overtime": 3948.19, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 22076.19, "iit": 867.94, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 4721.19, "netPay": 17355.0}, {"y": 2025, "m": 4, "level": "S-17", "foundation": 12820.69, "rankBonus": 0.0, "perfBonus": 5381.55, "saleBonus": 2291.56, "overtime": 5381.55, "areaAllowance": 2862.07, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 23355.87, "iit": 1450.26, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 5303.51, "netPay": 18052.36}, {"y": 2025, "m": 5, "level": "S-17", "foundation": 12850.58, "rankBonus": 0.0, "perfBonus": 5011.72, "saleBonus": 2561.22, "overtime": 5011.72, "areaAllowance": 2965.51, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 690.0, "adjustment": 0.0, "totalIncome": 24079.03, "iit": 3136.93, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 6990.18, "netPay": 17088.85}, {"y": 2025, "m": 6, "level": "S-17", "foundation": 13000.0, "rankBonus": 0.0, "perfBonus": 3493.19, "saleBonus": 2504.0, "overtime": 3493.19, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 230.0, "adjustment": 0.0, "totalIncome": 22227.19, "iit": 1337.39, "pension": 1761.71, "medical": 440.43, "unemployment": 110.11, "housingFund": 1541.0, "totalDeduction": 5190.64, "netPay": 17036.55}, {"y": 2025, "m": 7, "level": "S-17", "foundation": 12846.84, "rankBonus": 0.0, "perfBonus": 3681.47, "saleBonus": 2227.44, "overtime": 3681.47, "areaAllowance": 2964.66, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 21720.41, "iit": 1232.04, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 5632.06, "netPay": 16088.35}, {"y": 2025, "m": 8, "level": "S-17", "foundation": 12744.73, "rankBonus": 0.0, "perfBonus": 4245.17, "saleBonus": 2100.34, "overtime": 4245.17, "areaAllowance": 2706.61, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 690.0, "adjustment": 700.0, "totalIncome": 23186.85, "iit": 1378.69, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 5778.71, "netPay": 17408.14}, {"y": 2025, "m": 9, "level": "S-17", "foundation": 12734.77, "rankBonus": 0.0, "perfBonus": 6057.33, "saleBonus": 2125.05, "overtime": 6057.33, "areaAllowance": 2842.24, "dutyAllowance": 0.0, "refreshment": 4000.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 27759.39, "iit": 2199.56, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 6599.58, "netPay": 21159.81}, {"y": 2025, "m": 10, "level": "S-17", "foundation": 13000.0, "rankBonus": 0.0, "perfBonus": 3668.02, "saleBonus": 2108.0, "overtime": 3668.02, "areaAllowance": 3000.0, "dutyAllowance": 0.0, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 21776.02, "iit": 2475.2, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 6875.22, "netPay": 14900.8}, {"y": 2025, "m": 11, "level": "DL-15", "foundation": 12155.17, "rankBonus": 3639.37, "perfBonus": 2895.47, "saleBonus": 2458.99, "overtime": 6534.84, "areaAllowance": 2724.14, "dutyAllowance": 3178.16, "refreshment": 0.0, "travel": 230.0, "adjustment": 6371.92, "totalIncome": 33653.22, "iit": 4850.64, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 9250.66, "netPay": 24402.56}, {"y": 2025, "m": 12, "level": "DL-15", "foundation": 12327.59, "rankBonus": 1795.98, "perfBonus": 2785.56, "saleBonus": 2974.64, "overtime": 4581.54, "areaAllowance": 2862.07, "dutyAllowance": 3339.08, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 26084.92, "iit": 3336.98, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 7737.0, "netPay": 18347.92}, {"y": 2026, "m": 1, "level": "DL-15", "foundation": 12327.59, "rankBonus": 19440.42, "perfBonus": 3439.66, "saleBonus": 3868.56, "overtime": 22880.08, "areaAllowance": 2862.07, "dutyAllowance": 3339.08, "refreshment": 4000.0, "travel": 230.0, "adjustment": 0.0, "totalIncome": 49507.38, "iit": 1390.74, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 5790.76, "netPay": 43716.62}, {"y": 2026, "m": 2, "level": "DL-15", "foundation": 12241.38, "rankBonus": 0.0, "perfBonus": 3345.91, "saleBonus": 3603.1, "overtime": 3345.91, "areaAllowance": 2793.1, "dutyAllowance": 3258.62, "refreshment": 0.0, "travel": 460.0, "adjustment": 0.0, "totalIncome": 25702.11, "iit": 1530.21, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 5930.23, "netPay": 19771.88}, {"y": 2026, "m": 3, "level": "DL-15", "foundation": 12500.0, "rankBonus": 0.0, "perfBonus": 1467.67, "saleBonus": 2177.0, "overtime": 1467.67, "areaAllowance": 3000.0, "dutyAllowance": 3500.0, "refreshment": 0.0, "travel": 0.0, "adjustment": -0.01, "totalIncome": 22644.66, "iit": 1224.46, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 5624.48, "netPay": 17020.18}, {"y": 2026, "m": 4, "level": "DL-15", "foundation": 12364.7, "rankBonus": 359.2, "perfBonus": 3709.05, "saleBonus": 3851.85, "overtime": 4068.25, "areaAllowance": 2967.53, "dutyAllowance": 3462.12, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 26714.45, "iit": 1631.44, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 6031.46, "netPay": 20682.99}, {"y": 2026, "m": 5, "level": "DL-18", "foundation": 13250.0, "rankBonus": 0.0, "perfBonus": 3409.59, "saleBonus": 5116.0, "overtime": 3409.59, "areaAllowance": 3000.0, "dutyAllowance": 3500.0, "refreshment": 0.0, "travel": 460.0, "adjustment": 2093.07, "totalIncome": 30828.66, "iit": 2042.87, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 6442.89, "netPay": 24385.77}, {"y": 2026, "m": 6, "level": "DL-18", "foundation": 13067.24, "rankBonus": 682.5, "perfBonus": 4201.16, "saleBonus": 4372.29, "overtime": 4883.66, "areaAllowance": 2862.07, "dutyAllowance": 3339.08, "refreshment": 0.0, "travel": 0.0, "adjustment": 0.0, "totalIncome": 28524.34, "iit": 1812.43, "pension": 2011.44, "medical": 502.86, "unemployment": 125.72, "housingFund": 1760.0, "totalDeduction": 6212.45, "netPay": 22311.89}];
+// === DATA_INJECT:PRECOMPUTED ===
+var precomputed = {"yearly": {"2023": {"income": 237325.59, "net": 193416.34, "ded": 43909.25, "iit": 13978.1, "social": 29931.15, "months": 12}, "2024": {"income": 267430.36, "net": 209436.24, "ded": 57994.12, "iit": 19909.12, "social": 38085.0, "months": 12}, "2025": {"income": 293134.85, "net": 220464.32, "ded": 72670.53, "iit": 23150.91, "social": 49519.62, "months": 12}, "2026": {"income": 183921.6, "net": 147889.33, "ded": 36032.27, "iit": 9632.15, "social": 26400.12, "months": 6}}, "yoy": {"1": {"2023": {"income": 17500.0, "net": 14705.53}, "2024": {"income": 23481.33, "net": 20514.37}, "2025": {"income": 26767.17, "net": 22376.5}, "2026": {"income": 49507.38, "net": 43716.62}}, "2": {"2023": {"income": 17210.65, "net": 14424.86}, "2024": {"income": 18885.44, "net": 16042.55}, "2025": {"income": 20448.59, "net": 16247.48}, "2026": {"income": 25702.11, "net": 19771.88}}, "3": {"2023": {"income": 20332.01, "net": 17452.58}, "2024": {"income": 20642.88, "net": 17437.29}, "2025": {"income": 22076.19, "net": 17355.0}, "2026": {"income": 22644.66, "net": 17020.18}}, "4": {"2023": {"income": 18820.25, "net": 15434.21}, "2024": {"income": 19788.06, "net": 16064.43}, "2025": {"income": 23355.87, "net": 18052.36}, "2026": {"income": 26714.45, "net": 20682.99}}, "5": {"2023": {"income": 16263.13, "net": 12272.62}, "2024": {"income": 22668.07, "net": 17233.66}, "2025": {"income": 24079.03, "net": 17088.85}, "2026": {"income": 30828.66, "net": 24385.77}}, "6": {"2023": {"income": 20648.65, "net": 16838.96}, "2024": {"income": 22971.04, "net": 18929.11}, "2025": {"income": 22227.19, "net": 17036.55}, "2026": {"income": 28524.34, "net": 22311.89}}, "7": {"2023": {"income": 19259.39, "net": 15588.62}, "2024": {"income": 21238.38, "net": 16146.62}, "2025": {"income": 21720.41, "net": 16088.35}}, "8": {"2023": {"income": 19082.63, "net": 15429.54}, "2024": {"income": 21679.65, "net": 16543.76}, "2025": {"income": 23186.85, "net": 17408.14}}, "9": {"2023": {"income": 23545.86, "net": 19446.45}, "2024": {"income": 27388.14, "net": 21681.4}, "2025": {"income": 27759.39, "net": 21159.81}}, "10": {"2023": {"income": 23332.7, "net": 19254.6}, "2024": {"income": 21534.97, "net": 15286.33}, "2025": {"income": 21776.02, "net": 14900.8}}, "11": {"2023": {"income": 22469.74, "net": 18475.31}, "2024": {"income": 22233.27, "net": 15704.01}, "2025": {"income": 33653.22, "net": 24402.56}}, "12": {"2023": {"income": 18860.58, "net": 14093.06}, "2024": {"income": 24919.13, "net": 17852.71}, "2025": {"income": 26084.92, "net": 18347.92}}}, "quarterly": {"2023_1": {"income": 55042.66, "net": 46582.97}, "2023_2": {"income": 55732.03, "net": 44545.79}, "2023_3": {"income": 61887.88, "net": 50464.61}, "2023_4": {"income": 64663.02, "net": 51822.97}, "2024_1": {"income": 63009.65, "net": 53994.21}, "2024_2": {"income": 65427.17, "net": 52227.2}, "2024_3": {"income": 70306.17, "net": 54371.78}, "2024_4": {"income": 68687.37, "net": 48843.05}, "2025_1": {"income": 69291.95, "net": 55978.98}, "2025_2": {"income": 69662.09, "net": 52177.76}, "2025_3": {"income": 72666.65, "net": 54656.3}, "2025_4": {"income": 81514.16, "net": 57651.28}, "2026_1": {"income": 97854.15, "net": 80508.68}, "2026_2": {"income": 86067.45, "net": 67380.65}}, "mom_changes": [{"label": "2023.02", "pct": -1.9, "abs": -281.0}, {"label": "2023.03", "pct": 21.0, "abs": 3028.0}, {"label": "2023.04", "pct": -11.6, "abs": -2018.0}, {"label": "2023.05", "pct": -20.5, "abs": -3162.0}, {"label": "2023.06", "pct": 37.2, "abs": 4566.0}, {"label": "2023.07", "pct": -7.4, "abs": -1250.0}, {"label": "2023.08", "pct": -1.0, "abs": -159.0}, {"label": "2023.09", "pct": 26.0, "abs": 4017.0}, {"label": "2023.10", "pct": -1.0, "abs": -192.0}, {"label": "2023.11", "pct": -4.0, "abs": -779.0}, {"label": "2023.12", "pct": -23.7, "abs": -4382.0}, {"label": "2024.01", "pct": 45.6, "abs": 6421.0}, {"label": "2024.02", "pct": -21.8, "abs": -4472.0}, {"label": "2024.03", "pct": 8.7, "abs": 1395.0}, {"label": "2024.04", "pct": -7.9, "abs": -1373.0}, {"label": "2024.05", "pct": 7.3, "abs": 1169.0}, {"label": "2024.06", "pct": 9.8, "abs": 1695.0}, {"label": "2024.07", "pct": -14.7, "abs": -2782.0}, {"label": "2024.08", "pct": 2.5, "abs": 397.0}, {"label": "2024.09", "pct": 31.1, "abs": 5138.0}, {"label": "2024.10", "pct": -29.5, "abs": -6395.0}, {"label": "2024.11", "pct": 2.7, "abs": 418.0}, {"label": "2024.12", "pct": 13.7, "abs": 2149.0}, {"label": "2025.01", "pct": 25.3, "abs": 4524.0}, {"label": "2025.02", "pct": -27.4, "abs": -6129.0}, {"label": "2025.03", "pct": 6.8, "abs": 1108.0}, {"label": "2025.04", "pct": 4.0, "abs": 697.0}, {"label": "2025.05", "pct": -5.3, "abs": -964.0}, {"label": "2025.06", "pct": -0.3, "abs": -52.0}, {"label": "2025.07", "pct": -5.6, "abs": -948.0}, {"label": "2025.08", "pct": 8.2, "abs": 1320.0}, {"label": "2025.09", "pct": 21.6, "abs": 3752.0}, {"label": "2025.10", "pct": -29.6, "abs": -6259.0}, {"label": "2025.11", "pct": 63.8, "abs": 9502.0}, {"label": "2025.12", "pct": -24.8, "abs": -6055.0}, {"label": "2026.01", "pct": 138.3, "abs": 25369.0}, {"label": "2026.02", "pct": -54.8, "abs": -23945.0}, {"label": "2026.03", "pct": -13.9, "abs": -2752.0}, {"label": "2026.04", "pct": 21.5, "abs": 3663.0}, {"label": "2026.05", "pct": 17.9, "abs": 3703.0}, {"label": "2026.06", "pct": -8.5, "abs": -2074.0}], "level_history": [{"y": 2023, "m": 1, "level": "S-10"}, {"y": 2023, "m": 7, "level": "S-11"}, {"y": 2023, "m": 11, "level": "S-12"}, {"y": 2024, "m": 5, "level": "S-15"}, {"y": 2024, "m": 11, "level": "S-17"}, {"y": 2025, "m": 11, "level": "DL-15"}, {"y": 2026, "m": 5, "level": "DL-18"}], "bands": [5, 21, 9, 4, 2, 0, 0, 0, 0, 1], "band_labels": ["<15k", "15-18k", "18-21k", "21-24k", "24-27k", "27-30k", "30-33k", "33-36k", "36-40k", ">40k"], "all_levels": ["S-10", "S-11", "S-12", "S-15", "S-17", "DL-15", "DL-18"], "comp_income": [510841.1, 34781.55, 146823.88, 89937.2, 181605.43, 186025.54, 13403.13], "comp_deduction": [66670.28, 65797.8, 16449.48, 4112.61, 57576.0]};
+// === DATA_INJECT:PRECOMPUTED_END ===
+
+var allLabels = salaryData.map(function(d) { return d.y + '.' + String(d.m).padStart(2,'0'); });
+var incomeData = salaryData.map(function(d) { return d.totalIncome; });
+var netData = salaryData.map(function(d) { return d.netPay; });
+var dedData = salaryData.map(function(d) { return d.totalDeduction; });
+var iitData = salaryData.map(function(d) { return d.iit; });
+
+function fmt(n) { return n != null ? n.toLocaleString('zh-CN',{maximumFractionDigits:0}) : '-'; }
+function p(n) { return String(n).padStart(2,'0'); }
+
+// === TOAST ===
+function showToast(msg) {
+  var t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function() { t.remove(); }, 2500);
+}
+
+// === INTERACTIVE GLOW CANVAS ===
+(function initGlow() {
+  var canvas = document.getElementById('glowCanvas');
+  var ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  var glows = [];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+
+  function addGlow(x, y) {
+    glows.push({
+      x: x, y: y,
+      radius: 0,
+      maxRadius: 280 + Math.random() * 120,
+      opacity: 0.45 + Math.random() * 0.2,
+      life: 0,
+      maxLife: 2.5 + Math.random() * 1.5,
+      hue: [200, 260, 160, 280][Math.floor(Math.random() * 4)]
+    });
+    if (glows.length > 12) glows.shift();
+  }
+
+  document.addEventListener('click', function(e) {
+    addGlow(e.clientX, e.clientY);
+  });
+
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (var i = glows.length - 1; i >= 0; i--) {
+      var g = glows[i];
+      g.life += 0.016;
+      var progress = g.life / g.maxLife;
+      if (progress >= 1) {
+        glows.splice(i, 1);
+        continue;
+      }
+      g.radius = g.maxRadius * Math.pow(progress, 0.35);
+      var alpha = g.opacity * (1 - Math.pow(progress, 2.5));
+      var gradient = ctx.createRadialGradient(g.x, g.y, 0, g.x, g.y, g.radius);
+
+      var hsl = 'hsla(' + g.hue + ', 80%, 60%,';
+      gradient.addColorStop(0, hsl + (alpha * 0.6) + ')');
+      gradient.addColorStop(0.3, hsl + (alpha * 0.2) + ')');
+      gradient.addColorStop(0.6, hsl + (alpha * 0.05) + ')');
+      gradient.addColorStop(1, 'transparent');
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(g.x - g.radius, g.y - g.radius, g.radius * 2, g.radius * 2);
+    }
+
+    requestAnimationFrame(animate);
+  }
+  animate();
+})();
+
+// === CHART INSTANCES ===
+var chartInstances = {};
+function registerChart(id, chart) { chartInstances[id] = chart; }
+
+// === TAB SWITCHING ===
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+  el.classList.add('active');
+  var target = document.getElementById('tab-' + tab);
+  if (target) {
+    target.classList.add('active');
+    setTimeout(function() {
+      Object.values(chartInstances).forEach(function(c) { c.resize(); });
+    }, 120);
+    if (tab === 'breakdown') renderTable();
+  }
+}
+
+// === THEME TOGGLE ===
+var isDark = true;
+function toggleTheme() {
+  isDark = !isDark;
+  var root = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  if (isDark) {
+    root.style.setProperty('--bg-base', '#050812');
+    root.style.setProperty('--glass-bg', 'rgba(255,255,255,0.04)');
+    root.style.setProperty('--glass-bg-hover', 'rgba(255,255,255,0.08)');
+    root.style.setProperty('--glass-border', 'rgba(255,255,255,0.08)');
+    root.style.setProperty('--glass-border-hover', 'rgba(255,255,255,0.16)');
+    root.style.setProperty('--text', '#e8ecf1');
+    root.style.setProperty('--text-secondary', '#8b95a5');
+    root.style.setProperty('--text-muted', '#5a6475');
+    if (btn) btn.textContent = '🌙';
+    document.querySelector('.bg-orbs').style.opacity = '1';
+    showToast('已切换至深色主题');
+  } else {
+    root.style.setProperty('--bg-base', '#f0f2f5');
+    root.style.setProperty('--glass-bg', 'rgba(255,255,255,0.6)');
+    root.style.setProperty('--glass-bg-hover', 'rgba(255,255,255,0.85)');
+    root.style.setProperty('--glass-border', 'rgba(0,0,0,0.06)');
+    root.style.setProperty('--glass-border-hover', 'rgba(0,0,0,0.12)');
+    root.style.setProperty('--text', '#1a1d23');
+    root.style.setProperty('--text-secondary', '#5a6072');
+    root.style.setProperty('--text-muted', '#8e96a6');
+    if (btn) btn.textContent = '☀️';
+    document.querySelector('.bg-orbs').style.opacity = '0.3';
+    showToast('已切换至浅色主题');
+  }
+}
+
+// === FULLSCREEN ===
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+    showToast('已进入全屏模式');
+  } else {
+    document.exitFullscreen();
+    showToast('已退出全屏模式');
+  }
+}
+
+// === EXPORT ===
+function exportData() {
+  var csv = ['期间,职级,基本工资,职级奖,绩效奖,销售奖金,加班费,地区补贴,职务津贴,Refreshment,差旅费,调整项,总收入,个税,养老保险,医疗保险,失业保险,住房公积金,总扣除,实发金额'];
+  salaryData.forEach(function(d) {
+    csv.push([d.y+'.'+p(d.m),d.level,d.foundation,d.rankBonus,d.perfBonus,d.saleBonus,d.overtime,d.areaAllowance,d.dutyAllowance,d.refreshment,d.travel,d.adjustment,d.totalIncome,d.iit,d.pension,d.medical,d.unemployment,d.housingFund,d.totalDeduction,d.netPay].join(','));
+  });
+  var blob = new Blob(['\uFEFF' + csv.join('\n')], {type: 'text/csv;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a'); a.href = url; a.download = 'Titus_薪资数据_2023-2026.csv';
+  a.click(); URL.revokeObjectURL(url);
+  showToast('数据已导出为 CSV');
+}
+
+// === KPI FLASH ===
+function flashKPI(el) {
+  el.style.transform = 'scale(0.97)';
+  setTimeout(function() { el.style.transform = ''; }, 150);
+}
+
+// === COMMON CHART OPTIONS ===
+function darkTooltip() {
+  return {
+    backgroundColor: 'rgba(20,25,40,0.95)',
+    titleColor: '#e8ecf1',
+    bodyColor: '#cbd5e1',
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    padding: 12,
+    bodyFont: {size:12},
+    titleFont: {size:13,weight:'bold'}
+  };
+}
+function darkGrid() { return {color:'rgba(255,255,255,0.04)'}; }
+function yAxis() { return {ticks:{color:'#5a6475',callback:function(v){return'¥'+(v/1000).toFixed(0)+'k';},font:{size:10}},grid:darkGrid()}; }
+function xAxis(max) { return {ticks:{color:'#5a6475',maxTicksLimit:max||20,font:{size:9}},grid:{display:false}}; }
+function xAxisAll() {
+  return {
+    ticks: {
+      color: '#5a6475',
+      maxTicksLimit: 24,
+      font: {size: 9},
+      callback: function(v, i) { return salaryData[i] && salaryData[i].m === 1 ? allLabels[i] : ''; }
+    },
+    grid: darkGrid()
+  };
+}
+
+// ================================================================
+// GLASS BAR PLUGIN - 毛玻璃单色渐变圆角矩形
+// ================================================================
+
+function parseRgba(c) {
+  if (!c) return null;
+  if (typeof c === 'string') {
+    var m = c.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/);
+    if (m) return {r:+m[1],g:+m[2],b:+m[3],a:m[4]!==undefined?+m[4]:1};
+    if (c[0]==='#') {
+      var h = c.slice(1);
+      if (h.length===6) return {r:parseInt(h.slice(0,2),16),g:parseInt(h.slice(2,4),16),b:parseInt(h.slice(4,6),16),a:1};
+      if (h.length===3) return {r:parseInt(h[0]+h[0],16),g:parseInt(h[1]+h[1],16),b:parseInt(h[2]+h[2],16),a:1};
+    }
+  }
+  return null;
+}
+
+function glassRoundRect(ctx, x, y, w, h, r) {
+  if (w<0){x+=w;w=-w;}if(h<0){y+=h;h=-h;}
+  if (typeof r==='number') r={tl:Math.min(r,w/2,h/2),tr:Math.min(r,w/2,h/2),br:Math.min(r,w/2,h/2),bl:Math.min(r,w/2,h/2)};
+  else if (Array.isArray(r)&&r.length===4) r={tl:Math.min(r[0],w/2,h/2),tr:Math.min(r[1],w/2,h/2),br:Math.min(r[2],w/2,h/2),bl:Math.min(r[3],w/2,h/2)};
+  else r={tl:0,tr:0,br:0,bl:0};
+  ctx.beginPath();
+  ctx.moveTo(x+r.tl,y);
+  ctx.lineTo(x+w-r.tr,y);
+  ctx.arcTo(x+w,y,x+w,y+r.tr,r.tr);
+  ctx.lineTo(x+w,y+h-r.br);
+  ctx.arcTo(x+w,y+h,x+w-r.br,y+h,r.br);
+  ctx.lineTo(x+r.bl,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r.bl,r.bl);
+  ctx.lineTo(x,y+r.tl);
+  ctx.arcTo(x,y,x+r.tl,y,r.tl);
+  ctx.closePath();
+}
+
+var neonBarPlugin = {
+  id: 'neonBarPlugin',
+  afterDatasetDraw: function(chart, args) {
+    var ctx = chart.ctx;
+    var meta = args.meta;
+    if (meta.type !== 'bar') return;
+    var dataset = chart.data.datasets[meta.index];
+    var isH = chart.options.indexAxis === 'y';
+
+    ctx.save();
+    meta.data.forEach(function(bar, i) {
+      var v = dataset.data[i];
+      if (v == null || v === 0) return;
+      var bg = Array.isArray(dataset.backgroundColor) ? dataset.backgroundColor[i] : dataset.backgroundColor;
+      var c = parseRgba(bg);
+      if (!c) return;
+      if (c.a < 0.08) return;
+      var br = (typeof dataset.borderRadius === 'number') ? dataset.borderRadius : (Array.isArray(dataset.borderRadius) ? dataset.borderRadius[0] : 3);
+
+      if (isH) {
+        // HORIZONTAL: gradient along long edge (left→right), neon glow
+        var left = Math.min(bar.base, bar.x);
+        var right = Math.max(bar.base, bar.x);
+        var barW = right - left;
+        var barH = bar.height;
+        var barY = bar.y - barH/2;
+        if (barW < 2 || barH < 2) return;
+
+        // Outer neon glow
+        ctx.shadowColor = 'rgba('+c.r+','+c.g+','+c.b+',0.65)';
+        ctx.shadowBlur = Math.min(barH * 1.0, 20);
+
+        var grad = ctx.createLinearGradient(left, 0, right, 0);
+        grad.addColorStop(0,   'rgba('+c.r+','+c.g+','+c.b+',0.3)');
+        grad.addColorStop(0.15,'rgba('+c.r+','+c.g+','+c.b+',0.8)');
+        grad.addColorStop(0.4, 'rgba('+c.r+','+c.g+','+c.b+',1.0)');
+        grad.addColorStop(0.7, 'rgba('+c.r+','+c.g+','+c.b+',0.85)');
+        grad.addColorStop(1,   'rgba('+c.r+','+c.g+','+c.b+',0.25)');
+        ctx.fillStyle = grad;
+        glassRoundRect(ctx, left, barY, barW, barH, br);
+        ctx.fill();
+
+        // Reset shadow for inner core
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // White-hot core stripe
+        var core = ctx.createLinearGradient(left, 0, right, 0);
+        core.addColorStop(0,   'rgba(255,255,255,0)');
+        core.addColorStop(0.3, 'rgba(255,255,255,0.15)');
+        core.addColorStop(0.5, 'rgba(255,255,255,0.28)');
+        core.addColorStop(0.7, 'rgba(255,255,255,0.1)');
+        core.addColorStop(1,   'rgba(255,255,255,0)');
+        ctx.fillStyle = core;
+        glassRoundRect(ctx, left, barY + 2, barW, barH - 4, Math.max(br-2, 1));
+        ctx.fill();
+
+        // Glass semi-transparent overlay (frost)
+        var glass = ctx.createLinearGradient(0, barY, 0, barY + barH);
+        glass.addColorStop(0,   'rgba(255,255,255,0.12)');
+        glass.addColorStop(0.25,'rgba(255,255,255,0.04)');
+        glass.addColorStop(0.7, 'rgba(255,255,255,0.02)');
+        glass.addColorStop(1,   'rgba(255,255,255,0.08)');
+        ctx.fillStyle = glass;
+        glassRoundRect(ctx, left, barY, barW, barH, br);
+        ctx.fill();
+
+        // Glass edge reflection (top line)
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 1;
+        glassRoundRect(ctx, left, barY, barW, Math.min(3, barH), [br, br, 0, 0]);
+        ctx.stroke();
+
+        // Neon border
+        ctx.strokeStyle = 'rgba('+c.r+','+c.g+','+c.b+',1.0)';
+        ctx.lineWidth = 1.2;
+        glassRoundRect(ctx, left, barY, barW, barH, br);
+        ctx.stroke();
+      } else {
+        // VERTICAL: gradient along long edge (bottom→top), neon glow
+        var barTop = Math.min(bar.y, bar.base);
+        var barBot = Math.max(bar.y, bar.base);
+        var barH = barBot - barTop;
+        var barX = bar.x - bar.width/2;
+        var barW = bar.width;
+        if (barW < 2 || barH < 2) return;
+
+        // Outer neon glow
+        ctx.shadowColor = 'rgba('+c.r+','+c.g+','+c.b+',0.65)';
+        ctx.shadowBlur = Math.min(barW * 1.1, 18);
+
+        var grad = ctx.createLinearGradient(0, barBot, 0, barTop);
+        grad.addColorStop(0,   'rgba('+c.r+','+c.g+','+c.b+',0.25)');
+        grad.addColorStop(0.2, 'rgba('+c.r+','+c.g+','+c.b+',0.75)');
+        grad.addColorStop(0.5, 'rgba('+c.r+','+c.g+','+c.b+',1.0)');
+        grad.addColorStop(0.8, 'rgba('+c.r+','+c.g+','+c.b+',0.82)');
+        grad.addColorStop(1,   'rgba('+c.r+','+c.g+','+c.b+',0.25)');
+        ctx.fillStyle = grad;
+        glassRoundRect(ctx, barX, barTop, barW, barH, br);
+        ctx.fill();
+
+        // Reset shadow
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+
+        // White-hot core stripe
+        var core = ctx.createLinearGradient(0, barBot, 0, barTop);
+        core.addColorStop(0,   'rgba(255,255,255,0)');
+        core.addColorStop(0.3, 'rgba(255,255,255,0.1)');
+        core.addColorStop(0.5, 'rgba(255,255,255,0.25)');
+        core.addColorStop(0.7, 'rgba(255,255,255,0.08)');
+        core.addColorStop(1,   'rgba(255,255,255,0)');
+        ctx.fillStyle = core;
+        glassRoundRect(ctx, barX + 2, barTop, barW - 4, barH, Math.max(br-2, 1));
+        ctx.fill();
+
+        // Glass semi-transparent overlay (frost)
+        var glass = ctx.createLinearGradient(barX, 0, barX + barW, 0);
+        glass.addColorStop(0,   'rgba(255,255,255,0.1)');
+        glass.addColorStop(0.3, 'rgba(255,255,255,0.05)');
+        glass.addColorStop(0.7, 'rgba(255,255,255,0.02)');
+        glass.addColorStop(1,   'rgba(255,255,255,0.08)');
+        ctx.fillStyle = glass;
+        glassRoundRect(ctx, barX, barTop, barW, barH, br);
+        ctx.fill();
+
+        // Neon border
+        ctx.strokeStyle = 'rgba('+c.r+','+c.g+','+c.b+',1.0)';
+        ctx.lineWidth = 1.2;
+        glassRoundRect(ctx, barX, barTop, barW, barH, br);
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+  }
+};
+
+// ================================================================
+// ALL CHARTS - declared immediately, canvas may not exist yet but
+// Chart.js handles that gracefully (we check for element existence)
+// ================================================================
+
+// --- MAIN TREND ---
+(function() {
+  var ctx = document.getElementById('chartMainTrend');
+  if (!ctx) return;
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [
+        {label:'总收入',data:incomeData,borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,0.06)',fill:true,tension:0.35,pointRadius:1.5,pointHoverRadius:5,borderWidth:2},
+        {label:'实发金额',data:netData,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.35,pointRadius:1.5,pointHoverRadius:5,borderWidth:2},
+        {label:'总扣除',data:dedData,borderColor:'#a78bfa',backgroundColor:'rgba(167,139,250,0.04)',fill:true,tension:0.35,pointRadius:1,pointHoverRadius:4,borderWidth:1.5,borderDash:[5,3]}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode:'index',intersect:false},
+      plugins: {
+        legend: {labels:{color:'#8b95a5',usePointStyle:true,padding:16,font:{size:11}}},
+        tooltip: darkTooltip()
+      },
+      scales: {x: xAxisAll(), y: yAxis()}
+    }
+  });
+  registerChart('main', c);
+})();
+
+// --- YEARLY BAR ---
+(function() {
+  var ctx = document.getElementById('chartYearBar');
+  if (!ctx) return;
+  var yd = precomputed.yearly;
+  var yrs = [2023, 2024, 2025, 2026];
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: yrs.map(function(y) { return y + '年'; }),
+      datasets: [
+        {label:'总收入',data:yrs.map(function(y){return yd[y]?yd[y].income:0;}),backgroundColor:'rgba(96,165,250,0.7)',borderRadius:4,borderSkipped:false,borderColor:'rgba(96,165,250,0.9)',borderWidth:1},
+        {label:'实发金额',data:yrs.map(function(y){return yd[y]?yd[y].net:0;}),backgroundColor:'rgba(34,197,94,0.7)',borderRadius:4,borderSkipped:false,borderColor:'rgba(34,197,94,0.9)',borderWidth:1}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:14,font:{size:11}}},tooltip:darkTooltip()},
+      scales: {x:{ticks:{color:'#8b95a5',font:{size:12,weight:'bold'}},grid:{display:false}},y:yAxis()}
+    },
+    plugins: [neonBarPlugin]
+  });
+  registerChart('yearBar', c);
+})();
+
+// --- CUMULATIVE ---
+(function() {
+  var ctx = document.getElementById('chartCumulative');
+  if (!ctx) return;
+  var s = 0;
+  var cum = netData.map(function(v) { s += v; return s; });
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: allLabels,
+      datasets: [{label:'累计实发',data:cum,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.12)',fill:true,tension:0.4,pointRadius:0,pointHoverRadius:5,borderWidth:2.5}]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode:'index',intersect:false},
+      plugins: {legend:{display:false},tooltip:darkTooltip()},
+      scales: {x:xAxisAll(),y:{ticks:{color:'#5a6475',callback:function(v){return'¥'+(v/1e6).toFixed(1)+'M';},font:{size:10}},grid:darkGrid()}}
+    }
+  });
+  registerChart('cum', c);
+})();
+
+// --- YEARLY AVG DEVIATION (replaces MoM) ---
+(function() {
+  var ctx = document.getElementById('chartMoM');
+  if (!ctx) return;
+  // Compute yearly net averages
+  var yearlyNets = {};
+  salaryData.forEach(function(d) {
+    if (!yearlyNets[d.y]) yearlyNets[d.y] = {sum:0, count:0};
+    yearlyNets[d.y].sum += d.netPay;
+    yearlyNets[d.y].count += 1;
+  });
+  var yearAvg = {};
+  for (var y in yearlyNets) yearAvg[y] = yearlyNets[y].sum / yearlyNets[y].count;
+
+  // Deviation from yearly average (percentage)
+  var devLabels = [];
+  var devPcts = [];
+  salaryData.forEach(function(d, i) {
+    var avg = yearAvg[d.y];
+    var dev = avg > 0 ? ((d.netPay - avg) / avg * 100) : 0;
+    devLabels.push(d.y + '.' + String(d.m).padStart(2,'0'));
+    devPcts.push(dev);
+  });
+  var colors = devPcts.map(function(v) { return v >= 0 ? 'rgba(239,68,68,0.65)' : 'rgba(34,197,94,0.65)'; });
+  var borders = devPcts.map(function(v) { return v >= 0 ? '#ef4444' : '#22c55e'; });
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {labels:devLabels,datasets:[{label:'vs 年均%',data:devPcts,backgroundColor:colors,borderColor:borders,borderWidth:1,borderRadius:3,borderSkipped:false}]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{display:false},tooltip:Object.assign(darkTooltip(),{callbacks:{label:function(ctx){var v=ctx.parsed.y;return (v>0?'高于':'低于')+'年均 '+Math.abs(v).toFixed(1)+'% ('+(v>0?'涨▲':'跌▼')+')';}}})},
+      scales: {
+        x: {ticks:{color:'#5a6475',maxTicksLimit:24,font:{size:9},callback:function(v,i){return(i%3===0||i===devLabels.length-1)?devLabels[i]:'';}},grid:{display:false}},
+        y: {ticks:{color:'#5a6475',callback:function(v){return(v>0?'+':'')+v.toFixed(0)+'%';},font:{size:10}},grid:darkGrid()}
+      }
+    },
+    plugins: [neonBarPlugin]
+  });
+  registerChart('mom', c);
+})();
+
+// --- TAX RATE ---
+(function() {
+  var ctx = document.getElementById('chartTaxRate');
+  if (!ctx) return;
+  var taxRates = salaryData.map(function(d) { return (d.totalDeduction/d.totalIncome*100); });
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {labels:allLabels,datasets:[{label:'税负率%',data:taxRates,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.08)',fill:true,tension:0.3,pointRadius:1.5,pointHoverRadius:5,borderWidth:2}]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode:'index',intersect:false},
+      plugins: {legend:{display:false},tooltip:Object.assign(darkTooltip(),{callbacks:{label:function(ctx){return'税负率: '+ctx.parsed.y.toFixed(1)+'%';}}})},
+      scales: {x:xAxisAll(),y:{ticks:{color:'#5a6475',callback:function(v){return v+'%';},font:{size:10}},grid:darkGrid()}}
+    }
+  });
+  registerChart('taxRate', c);
+})();
+
+// --- NET RATE ---
+(function() {
+  var ctx = document.getElementById('chartNetRate');
+  if (!ctx) return;
+  var netRates = salaryData.map(function(d) { return (d.netPay/d.totalIncome*100); });
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {labels:allLabels,datasets:[{label:'净收入率%',data:netRates,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,pointRadius:1.5,pointHoverRadius:5,borderWidth:2}]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode:'index',intersect:false},
+      plugins: {legend:{display:false},tooltip:Object.assign(darkTooltip(),{callbacks:{label:function(ctx){return'到手率: '+ctx.parsed.y.toFixed(1)+'%';}}})},
+      scales: {x:xAxisAll(),y:{ticks:{color:'#5a6475',callback:function(v){return v+'%';},font:{size:10}},grid:darkGrid(),min:65,max:90}}
+    }
+  });
+  registerChart('netRate', c);
+})();
+
+// --- YOY ---
+(function() {
+  var ctx = document.getElementById('chartYoY');
+  if (!ctx) return;
+  var yoy = precomputed.yoy;
+  var months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  var yearsYM = [2023, 2024, 2025, 2026];
+  var colorsYM = ['#60a5fa', '#a78bfa', '#22c55e', '#f59e0b'];
+  var datasets = yearsYM.map(function(y, i) {
+    return {
+      label: y + '年',
+      data: months.map(function(_, mi) {
+        var m = mi + 1;
+        return (yoy[String(m)] && yoy[String(m)][String(y)]) ? yoy[String(m)][String(y)].net : null;
+      }),
+      borderColor: colorsYM[i],
+      backgroundColor: 'transparent',
+      tension: 0.3,
+      pointRadius: 1.5,
+      pointHoverRadius: 5,
+      borderWidth: 2
+    };
+  });
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {labels:months,datasets:datasets},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode:'index',intersect:false},
+      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:14,font:{size:11}}},tooltip:darkTooltip()},
+      scales: {x:{ticks:{color:'#8b95a5',font:{size:12}},grid:{display:false}},y:yAxis()}
+    }
+  });
+  registerChart('yoy', c);
+})();
+
+// --- INCOME H-BAR (replaces donut) ---
+(function() {
+  var ctx = document.getElementById('chartIncomeDonut');
+  if (!ctx) return;
+  var labels = ['基本工资','补贴津贴','加班费','绩效奖','销售奖金','职级奖','调整项'];
+  var colors = ['#60a5fa','#38bdf8','#a78bfa','#22c55e','#f59e0b','#818cf8','#c084fc'];
+  var raw = [precomputed.comp_income[0], precomputed.comp_income[5], precomputed.comp_income[4],
+             precomputed.comp_income[2], precomputed.comp_income[3], precomputed.comp_income[1],
+             precomputed.comp_income[6]];
+  var total = raw.reduce(function(a,b){return a+b;},0);
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: raw, backgroundColor: colors, borderRadius: 3, borderSkipped: false,
+        borderColor: colors.map(function(c){var p=parseRgba(c);return p?'rgba('+p.r+','+p.g+','+p.b+',0.9)':c;}), borderWidth: 1,
+        barThickness: 26
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      layout: {padding:{right:80}},
+      plugins: {
+        legend: {display:false},
+        tooltip: Object.assign(darkTooltip(), {callbacks:{label:function(ctx){return ctx.label+': ¥'+fmt(ctx.raw)+' ('+((ctx.raw/total)*100).toFixed(1)+'%)';}}})
+      },
+      scales: {
+        x: {ticks:{color:'#5a6475',font:{size:10},callback:function(v){return '¥'+(v/1000).toFixed(0)+'k';}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y: {ticks:{color:'#8b95a5',font:{size:12,weight:'600'}},grid:{display:false}}
+      }
+    },
+    plugins: [neonBarPlugin, {
+      id: 'pctLabels',
+      afterDatasetsDraw: function(chart) {
+        var ctx2 = chart.ctx;
+        chart.data.datasets[0].data.forEach(function(v, i) {
+          var meta = chart.getDatasetMeta(0);
+          var bar = meta.data[i];
+          var pct = ((v/total)*100).toFixed(1) + '%';
+          ctx2.save();
+          ctx2.fillStyle = '#8b95a5';
+          ctx2.font = '600 11px -apple-system, sans-serif';
+          ctx2.textAlign = 'left';
+          ctx2.textBaseline = 'middle';
+          ctx2.fillText(pct, bar.x + 8, bar.y);
+          ctx2.restore();
+        });
+      }
+    }]
+  });
+  registerChart('donut', c);
+})();
+
+// --- DEDUCTION H-BAR (replaces donut) ---
+(function() {
+  var ctx = document.getElementById('chartDedDonut');
+  if (!ctx) return;
+  var labels = ['个税','养老保险','住房公积金','医疗保险','失业保险'];
+  var colors = ['#60a5fa','#a78bfa','#22c55e','#38bdf8','#818cf8'];
+  var raw = [precomputed.comp_deduction[0], precomputed.comp_deduction[1], precomputed.comp_deduction[4],
+             precomputed.comp_deduction[2], precomputed.comp_deduction[3]];
+  var total = raw.reduce(function(a,b){return a+b;},0);
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: raw, backgroundColor: colors, borderRadius: 3, borderSkipped: false,
+        borderColor: colors.map(function(c){var p=parseRgba(c);return p?'rgba('+p.r+','+p.g+','+p.b+',0.9)':c;}), borderWidth: 1,
+        barThickness: 26
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      layout: {padding:{right:80}},
+      plugins: {
+        legend: {display:false},
+        tooltip: Object.assign(darkTooltip(), {callbacks:{label:function(ctx){return ctx.label+': ¥'+fmt(ctx.raw)+' ('+((ctx.raw/total)*100).toFixed(1)+'%)';}}})
+      },
+      scales: {
+        x: {ticks:{color:'#5a6475',font:{size:10},callback:function(v){return '¥'+(v/1000).toFixed(0)+'k';}},grid:{color:'rgba(255,255,255,0.04)'}},
+        y: {ticks:{color:'#8b95a5',font:{size:12,weight:'600'}},grid:{display:false}}
+      }
+    },
+    plugins: [neonBarPlugin, {
+      id: 'pctLabels2',
+      afterDatasetsDraw: function(chart) {
+        var ctx2 = chart.ctx;
+        chart.data.datasets[0].data.forEach(function(v, i) {
+          var meta = chart.getDatasetMeta(0);
+          var bar = meta.data[i];
+          var pct = ((v/total)*100).toFixed(1) + '%';
+          ctx2.save();
+          ctx2.fillStyle = '#8b95a5';
+          ctx2.font = '600 11px -apple-system, sans-serif';
+          ctx2.textAlign = 'left';
+          ctx2.textBaseline = 'middle';
+          ctx2.fillText(pct, bar.x + 8, bar.y);
+          ctx2.restore();
+        });
+      }
+    }]
+  });
+  registerChart('dedDonut', c);
+})();
+
+// --- YEARLY STACKED ---
+(function() {
+  var ctx = document.getElementById('chartYearStack');
+  if (!ctx) return;
+  var yrs = [2023, 2024, 2025, 2026];
+  var comps = yrs.map(function(y) {
+    var items = salaryData.filter(function(d) { return d.y === y; });
+    return {
+      foundation: items.reduce(function(s,d){return s+d.foundation;},0),
+      rankBonus: items.reduce(function(s,d){return s+d.rankBonus;},0),
+      perfBonus: items.reduce(function(s,d){return s+d.perfBonus;},0),
+      saleBonus: items.reduce(function(s,d){return s+d.saleBonus;},0),
+      overtime: items.reduce(function(s,d){return s+d.overtime;},0),
+      allowance: items.reduce(function(s,d){return s+d.areaAllowance+d.dutyAllowance+d.refreshment+d.travel;},0),
+      adjustment: items.reduce(function(s,d){return s+d.adjustment;},0)
+    };
+  });
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: yrs.map(function(y) { return y + '年'; }),
+      datasets: [
+        {label:'基本工资',data:comps.map(function(c){return c.foundation;}),backgroundColor:'rgba(96,165,250,0.75)',borderRadius:3},
+        {label:'职级奖',data:comps.map(function(c){return c.rankBonus;}),backgroundColor:'rgba(129,140,248,0.75)',borderRadius:3},
+        {label:'绩效奖',data:comps.map(function(c){return c.perfBonus;}),backgroundColor:'rgba(34,197,94,0.75)',borderRadius:3},
+        {label:'销售奖金',data:comps.map(function(c){return c.saleBonus;}),backgroundColor:'rgba(245,158,11,0.75)',borderRadius:3},
+        {label:'加班费',data:comps.map(function(c){return c.overtime;}),backgroundColor:'rgba(167,139,250,0.75)',borderRadius:3},
+        {label:'补贴津贴',data:comps.map(function(c){return c.allowance;}),backgroundColor:'rgba(56,189,248,0.75)',borderRadius:3},
+        {label:'调整项',data:comps.map(function(c){return c.adjustment;}),backgroundColor:'rgba(192,132,252,0.75)',borderRadius:3}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:10,font:{size:10}}},tooltip:darkTooltip()},
+      scales: {x:{ticks:{color:'#8b95a5',font:{size:12}},grid:{display:false}},y:yAxis()}
+    },
+    plugins: [neonBarPlugin]
+  });
+  registerChart('yearStack', c);
+})();
+
+// --- QUARTERLY ---
+(function() {
+  var ctx = document.getElementById('chartQuarterly');
+  if (!ctx) return;
+  var qd = precomputed.quarterly;
+  var qKeys = [];
+  for (var yy = 2023; yy <= 2026; yy++) {
+    for (var qq = 1; qq <= 4; qq++) {
+      var k = yy + '_' + qq;
+      if (qd[k]) qKeys.push(Object.assign({y:yy,q:qq}, qd[k]));
+    }
+  }
+  var qLabels = qKeys.map(function(q) { return q.y + ' Q' + q.q; });
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: qLabels,
+      datasets: [
+        {label:'总收入',data:qKeys.map(function(q){return q.income;}),borderColor:'#60a5fa',backgroundColor:'rgba(96,165,250,0.08)',fill:true,tension:0.3,pointRadius:2,borderWidth:2},
+        {label:'实发',data:qKeys.map(function(q){return q.net;}),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.08)',fill:true,tension:0.3,pointRadius:2,borderWidth:2}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode:'index',intersect:false},
+      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:14,font:{size:11}}},tooltip:darkTooltip()},
+      scales: {x:{ticks:{color:'#8b95a5',font:{size:11}},grid:{display:false}},y:yAxis()}
+    }
+  });
+  registerChart('quarterly', c);
+})();
+
+// --- DEDUCTION STACKED ---
+(function() {
+  var ctx = document.getElementById('chartDedStack');
+  if (!ctx) return;
+  var socialData = salaryData.map(function(d) { return d.pension+d.medical+d.unemployment+d.housingFund; });
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: allLabels,
+      datasets: [
+        {label:'个税',data:iitData,backgroundColor:'rgba(245,158,11,0.7)',borderRadius:3,borderSkipped:false},
+        {label:'社保公积金',data:socialData,backgroundColor:'rgba(167,139,250,0.7)',borderRadius:3,borderSkipped:false}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:14,font:{size:11}}},tooltip:darkTooltip()},
+      scales: {
+        x: {stacked:true,ticks:{color:'#5a6475',maxTicksLimit:24,font:{size:9},callback:function(v,i){return salaryData[i].m===1?allLabels[i]:'';}},grid:{display:false}},
+        y: Object.assign({stacked:true}, yAxis())
+      }
+    },
+    plugins: [neonBarPlugin]
+  });
+  registerChart('dedStack', c);
+})();
+
+// --- LEVEL TIMELINE (actual time + income growth) ---
+(function() {
+  var ctx = document.getElementById('chartLevel');
+  if (!ctx) return;
+  var allLevels = precomputed.all_levels;
+  var labels = salaryData.map(function(d) { return d.y + '.' + p(d.m); });
+  var netPayAll = salaryData.map(function(d) { return d.netPay; });
+  var levelAll = salaryData.map(function(d) { return allLevels.indexOf(d.level); });
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '实发金额',
+          data: netPayAll,
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.06)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 1,
+          pointHoverRadius: 5,
+          borderWidth: 2,
+          yAxisID: 'y'
+        },
+        {
+          label: '职级',
+          data: levelAll,
+          borderColor: '#a78bfa',
+          backgroundColor: 'rgba(167,139,250,0.08)',
+          fill: false,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 5,
+          borderWidth: 2.5,
+          stepped: true,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {labels:{color:'#8b95a5',usePointStyle:true,padding:12,font:{size:10}}},
+        tooltip: Object.assign(darkTooltip(), {callbacks:{label:function(ctx){
+          if (ctx.datasetIndex===0) return '实发: ¥'+fmt(ctx.parsed.y);
+          var idx=Math.round(ctx.parsed.y); return '职级: '+(allLevels[idx]||'');
+        }}})
+      },
+      scales: {
+        x: {ticks:{color:'#5a6475',maxTicksLimit:18,font:{size:8},callback:function(v,i){return i%3===0?labels[i]:'';}},grid:{display:false}},
+        y: {type:'linear',display:true,position:'left',ticks:{color:'#60a5fa',callback:function(v){return'¥'+(v/1000).toFixed(0)+'k';},font:{size:9}},grid:darkGrid()},
+        y1: {type:'linear',display:true,position:'right',ticks:{color:'#a78bfa',callback:function(v){var idx=Math.round(v);return allLevels[idx]||'';},stepSize:1,font:{size:9}},grid:{display:false},min:-0.5,max:allLevels.length-0.5}
+      }
+    }
+  });
+  registerChart('level', c);
+})();
+
+// --- HISTOGRAM ---
+(function() {
+  var ctx = document.getElementById('chartHistogram');
+  if (!ctx) return;
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {labels:precomputed.band_labels,datasets:[{label:'月份数',data:precomputed.bands,backgroundColor:'rgba(34,197,94,0.65)',borderRadius:3,borderSkipped:false,borderColor:'rgba(34,197,94,0.9)',borderWidth:1}]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{display:false},tooltip:darkTooltip()},
+      scales: {x:{ticks:{color:'#5a6475',font:{size:9}},grid:{display:false}},y:{ticks:{color:'#5a6475',stepSize:1,font:{size:9}},grid:darkGrid()}}
+    },
+    plugins: [neonBarPlugin]
+  });
+  registerChart('hist', c);
+})();
+
+// --- IIT MONTHLY ---
+(function() {
+  var ctx = document.getElementById('chartIITMonthly');
+  if (!ctx) return;
+  var colors = salaryData.map(function(d) {
+    var rate = d.iit / d.totalIncome * 100;
+    return rate > 10 ? 'rgba(239,68,68,0.7)' : (rate > 5 ? 'rgba(245,158,11,0.7)' : 'rgba(34,197,94,0.7)');
+  });
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {labels:allLabels,datasets:[{label:'个税',data:iitData,backgroundColor:colors,borderRadius:3,borderSkipped:false,borderColor:colors.map(function(c){var p=parseRgba(c);return p?'rgba('+p.r+','+p.g+','+p.b+',0.9)':c;}),borderWidth:1}]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{display:false},tooltip:darkTooltip()},
+      scales: {x:{ticks:{color:'#5a6475',maxTicksLimit:16,font:{size:8},callback:function(v,i){return i%3===0?allLabels[i]:'';}},grid:{display:false}},y:yAxis()}
+    },
+    plugins: [neonBarPlugin]
+  });
+  registerChart('iit', c);
+})();
+
+// --- BONUS HEAT ---
+(function() {
+  var ctx = document.getElementById('chartBonusHeat');
+  if (!ctx) return;
+  var bonusByMonth = {};
+  for (var m = 1; m <= 12; m++) {
+    bonusByMonth[m] = {2023:0,2024:0,2025:0,2026:0};
+    for (var yi = 0; yi < 4; yi++) {
+      var y = [2023,2024,2025,2026][yi];
+      var fd = salaryData.filter(function(d){return d.y===y&&d.m===m;});
+      if (fd.length) bonusByMonth[m][y] = fd[0].rankBonus + fd[0].saleBonus + fd[0].refreshment + fd[0].travel + fd[0].adjustment;
+    }
+  }
+  var c = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      datasets: [
+        {label:'2023',data:Array.from({length:12},function(_,i){return bonusByMonth[i+1][2023];}),backgroundColor:'rgba(96,165,250,0.6)',borderRadius:3},
+        {label:'2024',data:Array.from({length:12},function(_,i){return bonusByMonth[i+1][2024];}),backgroundColor:'rgba(167,139,250,0.6)',borderRadius:3},
+        {label:'2025',data:Array.from({length:12},function(_,i){return bonusByMonth[i+1][2025];}),backgroundColor:'rgba(34,197,94,0.6)',borderRadius:3},
+        {label:'2026',data:Array.from({length:12},function(_,i){return bonusByMonth[i+1][2026];}),backgroundColor:'rgba(56,189,248,0.6)',borderRadius:3}
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:8,font:{size:9}}},tooltip:darkTooltip()},
+      scales: {x:{ticks:{color:'#8b95a5',font:{size:10}},grid:{display:false}},y:yAxis()}
+    },
+    plugins: [neonBarPlugin]
+  });
+  registerChart('heat', c);
+})();
+
+// --- INCOME ELASTICITY ---
+(function() {
+  var ctx = document.getElementById('chartElasticity');
+  if (!ctx) return;
+  var elasticity = salaryData.map(function(d) {
+    var variable = d.rankBonus + d.perfBonus + d.saleBonus + d.overtime + d.adjustment;
+    return d.foundation > 0 ? (variable / d.foundation * 100) : 0;
+  });
+  var c = new Chart(ctx, {
+    type: 'line',
+    data: {labels:allLabels,datasets:[{label:'弹性指数%',data:elasticity,borderColor:'#f59e0b',backgroundColor:'rgba(245,158,11,0.1)',fill:true,tension:0.3,pointRadius:1.5,pointHoverRadius:5,borderWidth:2}]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: {mode:'index',intersect:false},
+      plugins: {legend:{display:false},tooltip:Object.assign(darkTooltip(),{callbacks:{label:function(ctx){return '弹性指数: '+ctx.parsed.y.toFixed(1)+'% (浮动收入÷基本工资)';}}})},
+      scales: {x:xAxisAll(),y:{ticks:{color:'#5a6475',callback:function(v){return v.toFixed(0)+'%';},font:{size:10}},grid:darkGrid()}}
+    }
+  });
+  registerChart('elasticity', c);
+})();
+
+// === YEARLY NUMERIC DATA (构成 tab) ===
+function computeYearlyData(y) {
+  var items = salaryData.filter(function(d) { return d.y === y; });
+  var n = items.length || 1;
+  var sum = function(key) { return items.reduce(function(s,d){return s+(d[key]||0);},0); };
+  return {
+    months: n,
+    foundation:   sum('foundation'),
+    rankBonus:    sum('rankBonus'),
+    perfBonus:    sum('perfBonus'),
+    saleBonus:    sum('saleBonus'),
+    overtime:     sum('overtime'),
+    areaAllowance:sum('areaAllowance'),
+    dutyAllowance:sum('dutyAllowance'),
+    refreshment:  sum('refreshment'),
+    travel:       sum('travel'),
+    adjustment:   sum('adjustment'),
+    totalIncome:  sum('totalIncome'),
+    iit:          sum('iit'),
+    pension:      sum('pension'),
+    medical:      sum('medical'),
+    unemployment: sum('unemployment'),
+    housingFund:  sum('housingFund'),
+    totalDeduction:sum('totalDeduction'),
+    netPay:       sum('netPay')
+  };
+}
+
+function switchYearNum(year, el) {
+  // Update active pill
+  document.querySelectorAll('.yr-pill').forEach(function(b) { b.classList.remove('active'); });
+  if (el) el.classList.add('active');
+
+  var d = computeYearlyData(year);
+  var n = d.months;
+  var grid = document.getElementById('yearDataGrid');
+
+  // Income rows
+  var incomeRows = [
+    {label:'基本工资',    key:'foundation',    tag:''},
+    {label:'职级奖',      key:'rankBonus',     tag:''},
+    {label:'绩效奖',      key:'perfBonus',     tag:''},
+    {label:'销售奖金',    key:'saleBonus',     tag:''},
+    {label:'加班费',      key:'overtime',      tag:''},
+    {label:'地区补贴',    key:'areaAllowance', tag:''},
+    {label:'职务津贴',    key:'dutyAllowance', tag:''},
+    {label:'Refreshment', key:'refreshment',   tag:''},
+    {label:'差旅费',      key:'travel',        tag:''},
+    {label:'调整项',      key:'adjustment',    tag:''}
+  ];
+
+  var incomeHTML = incomeRows.map(function(r) {
+    var v = d[r.key];
+    return '<div class="data-row">' +
+      '<span class="data-label">' + r.label + '</span>' +
+      '<div class="data-vals">' +
+        '<span class="data-avg">月均 ¥' + fmt(v/n) + '</span>' +
+        '<span class="data-val">¥' + fmt(v) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  incomeHTML += '<div class="data-row total">' +
+    '<span class="data-label" style="font-weight:700;color:var(--accent);">总收入</span>' +
+    '<div class="data-vals">' +
+      '<span class="data-avg">月均 ¥' + fmt(d.totalIncome/n) + '</span>' +
+      '<span class="data-val" style="color:var(--accent);">¥' + fmt(d.totalIncome) + '</span>' +
+    '</div>' +
+  '</div>';
+
+  // Deduction rows
+  var dedRows = [
+    {label:'个税',        key:'iit',           tag:'ded'},
+    {label:'养老保险',    key:'pension',       tag:''},
+    {label:'医疗保险',    key:'medical',       tag:''},
+    {label:'失业保险',    key:'unemployment',  tag:''},
+    {label:'住房公积金',  key:'housingFund',   tag:''}
+  ];
+
+  var dedHTML = dedRows.map(function(r) {
+    var v = d[r.key];
+    return '<div class="data-row">' +
+      '<span class="data-label">' + r.label + '</span>' +
+      '<div class="data-vals">' +
+        '<span class="data-avg">月均 ¥' + fmt(v/n) + '</span>' +
+        '<span class="data-val">¥' + fmt(v) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+
+  dedHTML += '<div class="data-row total">' +
+    '<span class="data-label" style="font-weight:700;color:var(--red);">总扣除</span>' +
+    '<div class="data-vals">' +
+      '<span class="data-avg">月均 ¥' + fmt(d.totalDeduction/n) + '</span>' +
+      '<span class="data-val" style="color:var(--red);">¥' + fmt(d.totalDeduction) + '</span>' +
+    '</div>' +
+  '</div>';
+
+  dedHTML += '<div class="data-row total" style="margin-top:10px;background:rgba(34,197,94,0.04);border-radius:8px;padding:10px 12px;">' +
+    '<span class="data-label" style="font-weight:700;color:var(--green);">实发金额</span>' +
+    '<div class="data-vals">' +
+      '<span class="data-avg">月均 ¥' + fmt(d.netPay/n) + '</span>' +
+      '<span class="data-val" style="color:var(--green);font-size:16px;">¥' + fmt(d.netPay) + '</span>' +
+    '</div>' +
+  '</div>';
+
+  grid.innerHTML =
+    '<div>' +
+      '<div class="data-col-title">📥 收入构成 <span class="data-tag income" style="margin-left:6px;">' + n + '个月</span></div>' +
+      incomeHTML +
+    '</div>' +
+    '<div>' +
+      '<div class="data-col-title">📤 扣除 & 实发 <span class="data-tag ded" style="margin-left:6px;">' + n + '个月</span></div>' +
+      dedHTML +
+    '</div>';
+}
+
+// Initialize with 2023 data
+(function() {
+  if (document.getElementById('yearDataGrid')) {
+    switchYearNum(2023, document.querySelector('.yr-pill.active'));
+  }
+})();
+
+// === TABLE ===
+function renderTable(filter) {
+  var tbody = document.getElementById('tableBody');
+  if (!tbody) return;
+  var f = (filter || '').toLowerCase();
+  var filtered = salaryData.filter(function(d) {
+    return !f || String(d.y).includes(f) || p(d.m).includes(f) || d.level.toLowerCase().includes(f);
+  });
+  var html = '';
+  filtered.forEach(function(d) {
+    var allowance = d.areaAllowance + d.dutyAllowance + d.refreshment + d.travel;
+    var social = d.pension + d.medical + d.unemployment + d.housingFund;
+    var nr = (d.netPay / d.totalIncome * 100).toFixed(1);
+    html += '<tr>';
+    html += '<td>' + d.y + '.' + p(d.m) + '</td>';
+    html += '<td><span class="level-tag">' + d.level + '</span></td>';
+    html += '<td>' + fmt(d.foundation) + '</td>';
+    html += '<td>' + (d.rankBonus > 0 ? fmt(d.rankBonus) : '-') + '</td>';
+    html += '<td>' + fmt(d.perfBonus) + '</td>';
+    html += '<td>' + fmt(d.saleBonus) + '</td>';
+    html += '<td>' + fmt(d.overtime) + '</td>';
+    html += '<td>' + (allowance > 0 ? fmt(allowance) : '-') + '</td>';
+    html += '<td>' + (d.adjustment !== 0 ? fmt(d.adjustment) : '-') + '</td>';
+    html += '<td style="font-weight:600">' + fmt(d.totalIncome) + '</td>';
+    html += '<td class="tax-value">' + fmt(d.iit) + '</td>';
+    html += '<td>' + fmt(social) + '</td>';
+    html += '<td style="color:#ef4444">' + fmt(d.totalDeduction) + '</td>';
+    html += '<td class="net-value">' + fmt(d.netPay) + '</td>';
+    html += '<td>' + nr + '%</td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+function filterTable(v) { renderTable(v); }
+renderTable();
+</script>
+</body>
+</html>
