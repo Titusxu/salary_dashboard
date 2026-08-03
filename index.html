@@ -1667,6 +1667,19 @@ function renderTable(filter) {
   tbody.innerHTML = html;
 }
 function filterTable(v) { renderTable(v); }
+
+// Expose data and functions to global scope for HTML onclick handlers
+window.salaryData = salaryData;
+window.precomputed = precomputed;
+window.switchTab = switchTab;
+window.exportData = exportData;
+window.toggleFullscreen = toggleFullscreen;
+window.toggleTheme = toggleTheme;
+window.flashKPI = flashKPI;
+window.switchYearNum = switchYearNum;
+window.renderTable = renderTable;
+window.filterTable = filterTable;
+
 renderTable();
 
   })
