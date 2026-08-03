@@ -320,6 +320,47 @@ tr:hover td{background:rgba(255,255,255,0.03);}
   .kpi-grid{grid-template-columns:1fr;}
   .header h1{font-size:18px;}
 }
+
+/* ===== DATA EDITOR PANEL ===== */
+.editor-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.editor-overlay.open{opacity:1;pointer-events:auto;}
+.editor-panel{position:fixed;top:0;right:-520px;width:480px;max-width:92vw;height:100%;background:rgba(10,14,28,0.98);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border-left:1px solid var(--glass-border);z-index:1001;overflow-y:auto;padding:24px;transition:right 0.35s cubic-bezier(0.4,0,0.2,1);}
+.editor-panel.open{right:0;}
+.editor-panel h2{font-size:18px;font-weight:800;margin-bottom:6px;}
+.editor-panel .subtitle{font-size:12px;color:var(--text-muted);margin-bottom:20px;}
+.editor-field{margin-bottom:12px;}
+.editor-field label{display:block;font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.editor-field input, .editor-field select{padding:8px 12px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:#fff;font-size:13px;font-family:monospace;transition:border-color 0.2s;}
+.editor-field input:focus, .editor-field select:focus{outline:none;border-color:var(--accent);}
+.editor-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.editor-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.editor-field input.calc{color:var(--accent);font-weight:700;}
+.editor-field input.net{color:var(--green);font-weight:700;font-size:16px;}
+.editor-divider{margin:18px 0;border:none;border-top:1px solid var(--glass-border);}
+.editor-preview{background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:10px;padding:14px;margin-bottom:16px;}
+.editor-preview .preview-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text-secondary);}
+.editor-preview .preview-row strong{color:var(--text);}
+.editor-actions{display:flex;gap:8px;}
+.editor-btn{padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all 0.2s;}
+.editor-btn.primary{background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;flex:1;}
+.editor-btn.primary:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(96,165,250,0.3);}
+.editor-btn.primary:disabled{opacity:0.4;cursor:not-allowed;transform:none;box-shadow:none;}
+.editor-btn.danger{background:rgba(239,68,68,0.15);color:var(--red);border:1px solid rgba(239,68,68,0.3);}
+.editor-btn.ghost{background:var(--glass-bg);color:var(--text-secondary);border:1px solid var(--glass-border);}
+.editor-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass-bg);color:var(--text-secondary);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.editor-close:hover{background:rgba(255,255,255,0.1);color:#fff;}
+/* Token modal */
+.token-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(16,20,32,0.98);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid var(--glass-border);border-radius:16px;padding:28px;z-index:1002;max-width:420px;width:92%;display:none;}
+.token-modal.show{display:block;}
+.token-modal h3{font-size:16px;font-weight:800;margin-bottom:8px;}
+.token-modal p{font-size:12px;color:var(--text-muted);margin-bottom:16px;}
+.token-modal input{width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);color:#fff;font-size:13px;font-family:monospace;margin-bottom:12px;}
+.token-modal input:focus{outline:none;border-color:var(--accent);}
+.token-modal .hint{font-size:11px;color:var(--text-muted);margin-bottom:12px;}
+.token-modal .hint a{color:var(--accent);}
+.editor-toast{position:fixed;bottom:30px;right:30px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:1003;animation:toastIn 0.3s ease;transition:opacity 0.3s;}
+.editor-toast.success{background:rgba(34,197,94,0.2);border:1px solid rgba(34,197,94,0.4);color:var(--green);}
+.editor-toast.error{background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--red);}
 </style>
 </head>
 <body>
@@ -337,13 +378,88 @@ tr:hover td{background:rgba(255,255,255,0.03);}
     <h1>Titus · Salary Analysis</h1>
     <div class="header-actions">
       <span class="header-badge" id="header-months">42个月</span>
+      <button class="header-btn" onclick="toggleEditor()">✏️ 添加数据</button>
       <button class="header-btn" onclick="exportData()">📤 导出</button>
       <button class="header-btn" onclick="toggleFullscreen()">⛶ 全屏</button>
     </div>
   </div>
 </div>
 
-<div class="container">
+<!-- DATA EDITOR PANEL -->
+<div class="editor-overlay" id="editorOverlay" onclick="toggleEditor()"></div>
+<div class="editor-panel" id="editorPanel">
+  <button class="editor-close" onclick="toggleEditor()">✕</button>
+  <h2>✏️ 添加月度数据</h2>
+  <p class="subtitle" id="editorDateHint">2026年 8月</p>
+
+  <div class="editor-row">
+    <div class="editor-field"><label>年份</label><input type="number" id="edYear" value="2026" min="2023" max="2030"></div>
+    <div class="editor-field"><label>月份</label><input type="number" id="edMonth" value="8" min="1" max="12"></div>
+  </div>
+  <div class="editor-field"><label>职级</label><input type="text" id="edLevel" value="DL-18" placeholder="如 DL-18"></div>
+
+  <div class="editor-row">
+    <div class="editor-field"><label>基本工资</label><input type="number" id="edFoundation" value="13250" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>职级奖</label><input type="number" id="edRankBonus" value="0" step="0.01" onchange="calcEditor()"></div>
+  </div>
+  <div class="editor-row">
+    <div class="editor-field"><label>绩效奖</label><input type="number" id="edPerfBonus" value="4651" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>销售奖金</label><input type="number" id="edSaleBonus" value="0" step="0.01" onchange="calcEditor()"></div>
+  </div>
+  <div class="editor-row">
+    <div class="editor-field"><label>加班费</label><input type="number" id="edOvertime" value="0" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>地区补贴</label><input type="number" id="edAreaAllowance" value="3000" step="0.01" onchange="calcEditor()"></div>
+  </div>
+  <div class="editor-row">
+    <div class="editor-field"><label>职务津贴</label><input type="number" id="edDutyAllowance" value="3500" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>Refreshment</label><input type="number" id="edRefreshment" value="0" step="0.01" onchange="calcEditor()"></div>
+  </div>
+  <div class="editor-row">
+    <div class="editor-field"><label>差旅费</label><input type="number" id="edTravel" value="0" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>调整项</label><input type="number" id="edAdjustment" value="0" step="0.01" onchange="calcEditor()"></div>
+  </div>
+
+  <div class="editor-field"><label>总收入 (自动计算)</label><input class="calc" type="number" id="edTotalIncome" readonly></div>
+
+  <hr class="editor-divider">
+  <div class="editor-row-3">
+    <div class="editor-field"><label>个税</label><input type="number" id="edIIT" value="0" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>养老保险</label><input type="number" id="edPension" value="0" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>医疗保险</label><input type="number" id="edMedical" value="0" step="0.01" onchange="calcEditor()"></div>
+  </div>
+  <div class="editor-row">
+    <div class="editor-field"><label>失业保险</label><input type="number" id="edUnemployment" value="0" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>住房公积金</label><input type="number" id="edHousingFund" value="0" step="0.01" onchange="calcEditor()"></div>
+  </div>
+  <div class="editor-field"><label>总扣除 (自动计算)</label><input class="calc" type="number" id="edTotalDeduction" readonly></div>
+  <div class="editor-field"><label>实发金额 ✨</label><input class="net" type="number" id="edNetPay" readonly></div>
+
+  <hr class="editor-divider">
+  <div class="editor-preview" id="editorPreview" style="display:none">
+    <div class="preview-row"><span>期间</span><strong id="pvPeriod"></strong></div>
+    <div class="preview-row"><span>总收入</span><strong id="pvIncome"></strong></div>
+    <div class="preview-row"><span>总扣除</span><strong id="pvDed" style="color:var(--red)"></strong></div>
+    <div class="preview-row"><span>实发金额</span><strong id="pvNet" style="color:var(--green)"></strong></div>
+  </div>
+
+  <div class="editor-actions">
+    <button class="editor-btn danger" onclick="toggleEditor()">取消</button>
+    <button class="editor-btn ghost" onclick="previewEditor()">预览</button>
+    <button class="editor-btn primary" id="btnSaveEditor" onclick="saveEditor()">💾 保存到 GitHub</button>
+  </div>
+</div>
+
+<!-- TOKEN MODAL -->
+<div class="token-modal" id="tokenModal">
+  <h3>🔑 首次使用·设置 GitHub Token</h3>
+  <p>需要 GitHub Token 才能将数据保存到线上</p>
+  <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxx...">
+  <p class="hint">没有 Token？<a href="https://github.com/settings/tokens" target="_blank">点击这里创建</a>（勾选 repo 权限）</p>
+  <button class="editor-btn primary" onclick="saveToken()" style="width:100%">保存 Token</button>
+  <button class="editor-btn ghost" onclick="skipToken()" style="width:100%;margin-top:6px;">跳过（仅本地预览）</button>
+</div>
+
+<div class="container">  <!-- CONTAINER OPEN -->
 
 <div class="tab-nav">
   <button class="tab-btn active" onclick="switchTab('overview',this)">📊 总览</button>
@@ -1668,6 +1784,196 @@ function renderTable(filter) {
 }
 function filterTable(v) { renderTable(v); }
 
+// ===== DATA EDITOR =====
+function toggleEditor() {
+  var panel = document.getElementById('editorPanel');
+  var overlay = document.getElementById('editorOverlay');
+  var isOpen = panel.classList.contains('open');
+  if (isOpen) { panel.classList.remove('open'); overlay.classList.remove('open'); }
+  else {
+    var d = new Date();
+    document.getElementById('edYear').value = d.getFullYear();
+    document.getElementById('edMonth').value = d.getMonth() + 1;
+    document.getElementById('editorDateHint').textContent = d.getFullYear() + '年 ' + (d.getMonth()+1) + '月';
+    calcEditor();
+    document.getElementById('editorPreview').style.display = 'none';
+    panel.classList.add('open'); overlay.classList.add('open');
+  }
+}
+
+function calcEditor() {
+  var vals = ['edFoundation','edRankBonus','edPerfBonus','edSaleBonus','edOvertime',
+    'edAreaAllowance','edDutyAllowance','edRefreshment','edTravel','edAdjustment'];
+  var income = 0;
+  vals.forEach(function(id) { income += parseFloat(document.getElementById(id).value) || 0; });
+  document.getElementById('edTotalIncome').value = income.toFixed(2);
+
+  var dedVals = ['edIIT','edPension','edMedical','edUnemployment','edHousingFund'];
+  var ded = 0;
+  dedVals.forEach(function(id) { ded += parseFloat(document.getElementById(id).value) || 0; });
+  document.getElementById('edTotalDeduction').value = ded.toFixed(2);
+  document.getElementById('edNetPay').value = (income - ded).toFixed(2);
+}
+
+function previewEditor() {
+  var y = document.getElementById('edYear').value;
+  var m = document.getElementById('edMonth').value;
+  document.getElementById('pvPeriod').textContent = y + '.' + m;
+  document.getElementById('pvIncome').textContent = '¥' + document.getElementById('edTotalIncome').value;
+  document.getElementById('pvDed').textContent = '¥' + document.getElementById('edTotalDeduction').value;
+  document.getElementById('pvNet').textContent = '¥' + document.getElementById('edNetPay').value;
+  document.getElementById('editorPreview').style.display = 'block';
+  showEditorToast('预览确认无误后点击"保存到 GitHub"', '');
+}
+
+function saveEditor() {
+  var token = localStorage.getItem('gh_token');
+  if (!token) {
+    document.getElementById('tokenModal').classList.add('show');
+    return;
+  }
+  doSave(token);
+}
+
+function doSave(token) {
+  var btn = document.getElementById('btnSaveEditor');
+  btn.disabled = true; btn.textContent = '⏳ 保存中...';
+
+  var newRecord = { y: parseInt(document.getElementById('edYear').value), m: parseInt(document.getElementById('edMonth').value),
+    level: document.getElementById('edLevel').value,
+    foundation: parseFloat(document.getElementById('edFoundation').value),
+    rankBonus: parseFloat(document.getElementById('edRankBonus').value),
+    perfBonus: parseFloat(document.getElementById('edPerfBonus').value),
+    saleBonus: parseFloat(document.getElementById('edSaleBonus').value),
+    overtime: parseFloat(document.getElementById('edOvertime').value),
+    areaAllowance: parseFloat(document.getElementById('edAreaAllowance').value),
+    dutyAllowance: parseFloat(document.getElementById('edDutyAllowance').value),
+    refreshment: parseFloat(document.getElementById('edRefreshment').value),
+    travel: parseFloat(document.getElementById('edTravel').value),
+    adjustment: parseFloat(document.getElementById('edAdjustment').value),
+    totalIncome: parseFloat(document.getElementById('edTotalIncome').value),
+    iit: parseFloat(document.getElementById('edIIT').value),
+    pension: parseFloat(document.getElementById('edPension').value),
+    medical: parseFloat(document.getElementById('edMedical').value),
+    unemployment: parseFloat(document.getElementById('edUnemployment').value),
+    housingFund: parseFloat(document.getElementById('edHousingFund').value),
+    totalDeduction: parseFloat(document.getElementById('edTotalDeduction').value),
+    netPay: parseFloat(document.getElementById('edNetPay').value)
+  };
+
+  // Validation
+  var yr = newRecord.y, mo = newRecord.m;
+  var dup = salaryData.find(function(d) { return d.y === yr && d.m === mo; });
+  if (dup) {
+    if (!confirm(yr + '年' + mo + '月的数据已存在，是否覆盖？')) {
+      btn.disabled = false; btn.textContent = '💾 保存到 GitHub'; return;
+    }
+    salaryData = salaryData.filter(function(d) { return !(d.y === yr && d.m === mo); });
+  }
+  salaryData.push(newRecord);
+  salaryData.sort(function(a,b) { return a.y*100+a.m - b.y*100+b.m; });
+
+  // Recompute yearly summary
+  var ysum = {};
+  salaryData.forEach(function(d) {
+    if (!ysum[d.y]) ysum[d.y] = { income:0, net:0, months:0 };
+    ysum[d.y].income += d.totalIncome; ysum[d.y].net += d.netPay; ysum[d.y].months++;
+  });
+  precomputed = { yearly: ysum };
+
+  var payload = { message: 'Update: ' + yr + '.' + String(mo).padStart(2,'0') + ' salary data',
+    content: btoa(unescape(encodeURIComponent(JSON.stringify({salaryData:salaryData,precomputed:precomputed},null,'  ')))),
+    branch: 'main'
+  };
+
+  // Get current SHA
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'https://api.github.com/repos/Titusxu/salary_dashboard/contents/data.json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.setRequestHeader('Accept', 'application/vnd.github.v3+json');
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      var resp = JSON.parse(xhr.responseText);
+      payload.sha = resp.sha;
+      putPayload(payload, token, btn, newRecord);
+    } else {
+      showEditorToast('获取文件信息失败，请检查 Token 是否有效', 'error');
+      btn.disabled = false; btn.textContent = '💾 保存到 GitHub';
+    }
+  };
+  xhr.onerror = function() {
+    showEditorToast('网络错误，请检查网络连接', 'error');
+    btn.disabled = false; btn.textContent = '💾 保存到 GitHub';
+  };
+  xhr.send();
+}
+
+function putPayload(payload, token, btn, newRecord) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('PUT', 'https://api.github.com/repos/Titusxu/salary_dashboard/contents/data.json');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    btn.disabled = false; btn.textContent = '💾 保存到 GitHub';
+    if (xhr.status === 200 || xhr.status === 201) {
+      showEditorToast('✅ 保存成功！数据已发布，1-2分钟后刷新页面查看', 'success');
+      // Add locally immediately
+      updateAllKPIs();
+      toggleEditor();
+      // Reload after 2s to get fresh data from CDN
+      setTimeout(function() { location.reload(); }, 2500);
+    } else {
+      var msg = '保存失败';
+      try { var r = JSON.parse(xhr.responseText); msg = r.message || msg; } catch(e) {}
+      showEditorToast('❌ ' + msg, 'error');
+    }
+  };
+  xhr.onerror = function() {
+    showEditorToast('网络错误，请重试', 'error');
+    btn.disabled = false; btn.textContent = '💾 保存到 GitHub';
+  };
+  xhr.send(JSON.stringify(payload));
+}
+
+function updateAllKPIs() {
+  var totalIncome = salaryData.reduce(function(s,d){return s+d.totalIncome;},0);
+  var totalNet = salaryData.reduce(function(s,d){return s+d.netPay;},0);
+  var totalDed = salaryData.reduce(function(s,d){return s+d.totalDeduction;},0);
+  var totalIIT = salaryData.reduce(function(s,d){return s+d.iit;},0);
+  var totalSocial = salaryData.reduce(function(s,d){return s+d.pension+d.medical+d.unemployment+d.housingFund;},0);
+  var months = salaryData.length;
+  document.getElementById('kpi-income').textContent = '¥' + fmt(Math.round(totalIncome));
+  document.getElementById('kpi-net').textContent = '¥' + fmt(Math.round(totalNet));
+  document.getElementById('kpi-ded').textContent = '¥' + fmt(Math.round(totalDed));
+  document.getElementById('kpi-tax').textContent = '¥' + fmt(Math.round(totalIIT));
+  document.getElementById('kpi-social').textContent = '¥' + fmt(Math.round(totalSocial));
+  document.getElementById('header-months').textContent = months + '个月';
+}
+
+function saveToken() {
+  var t = document.getElementById('tokenInput').value.trim();
+  if (!t) { showEditorToast('请输入 Token', 'error'); return; }
+  localStorage.setItem('gh_token', t);
+  document.getElementById('tokenModal').classList.remove('show');
+  showEditorToast('Token 已保存，正在提交数据...', 'success');
+  setTimeout(function() { doSave(t); }, 500);
+}
+
+function skipToken() {
+  document.getElementById('tokenModal').classList.remove('show');
+  showEditorToast('已跳过，数据仅保存在本地预览（刷新后丢失）', '');
+}
+
+function showEditorToast(msg, type) {
+  var existing = document.querySelector('.editor-toast');
+  if (existing) existing.remove();
+  var el = document.createElement('div');
+  el.className = 'editor-toast ' + (type || '');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { if (el.parentNode) el.remove(); }, 4000);
+}
+
 // Expose data and functions to global scope for HTML onclick handlers
 window.salaryData = salaryData;
 window.precomputed = precomputed;
@@ -1679,6 +1985,12 @@ window.flashKPI = flashKPI;
 window.switchYearNum = switchYearNum;
 window.renderTable = renderTable;
 window.filterTable = filterTable;
+window.toggleEditor = toggleEditor;
+window.calcEditor = calcEditor;
+window.previewEditor = previewEditor;
+window.saveEditor = saveEditor;
+window.saveToken = saveToken;
+window.skipToken = skipToken;
 
 renderTable();
 
