@@ -591,6 +591,19 @@ tr:hover td{background:rgba(255,255,255,0.03);}
       </div>
     </div>
   </div>
+  <div class="table-card">
+    <div class="table-header">
+      <div class="chart-title"><span class="dot" style="background:#fbbf24"></span>半年 / 年度奖金记录（独立于月度工资发放）</div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>发放月</th><th>类型</th><th>税前奖金</th><th>奖金个税</th><th>实发</th><th>备注</th></tr>
+        </thead>
+        <tbody id="bonusTableBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- TAB: Breakdown -->
@@ -653,6 +666,17 @@ fetch('data.json?v=' + Date.now())
   .then(function(data) {
     var salaryData = data.salaryData;
     var precomputed = data.precomputed;
+    var bonuses = data.bonuses || [];   // 奖金台账（半年奖/年度奖/表彰金等，独立于月度）
+
+function bonusByYear(y) {
+  var bs = bonuses.filter(function(b) { return b.y === y; });
+  return {
+    count: bs.length,
+    gross: bs.reduce(function(s,b){return s+b.gross;},0),
+    tax:   bs.reduce(function(s,b){return s+b.tax;},0),
+    net:   bs.reduce(function(s,b){return s+b.net;},0)
+  };
+}
 
 var allLabels = salaryData.map(function(d) { return d.y + '.' + String(d.m).padStart(2,'0'); });
 var incomeData = salaryData.map(function(d) { return d.totalIncome; });
@@ -665,10 +689,14 @@ function p(n) { return String(n).padStart(2,'0'); }
 
 // === DYNAMIC KPI UPDATE ===
 (function updateKPIs() {
-  var totalIncome = salaryData.reduce(function(s,d){return s+d.totalIncome;},0);
-  var totalNet = salaryData.reduce(function(s,d){return s+d.netPay;},0);
-  var totalDed = salaryData.reduce(function(s,d){return s+d.totalDeduction;},0);
-  var totalIIT = salaryData.reduce(function(s,d){return s+d.iit;},0);
+  // 奖金台账并入年度口径（合并显示）
+  var bGross = bonuses.reduce(function(s,b){return s+b.gross;},0);
+  var bNet = bonuses.reduce(function(s,b){return s+b.net;},0);
+  var bTax = bonuses.reduce(function(s,b){return s+b.tax;},0);
+  var totalIncome = salaryData.reduce(function(s,d){return s+d.totalIncome;},0) + bGross;
+  var totalNet = salaryData.reduce(function(s,d){return s+d.netPay;},0) + bNet;
+  var totalDed = salaryData.reduce(function(s,d){return s+d.totalDeduction;},0) + bTax;
+  var totalIIT = salaryData.reduce(function(s,d){return s+d.iit;},0) + bTax;
   var totalSocial = salaryData.reduce(function(s,d){return s+d.pension+d.medical+d.unemployment+d.housingFund;},0);
   var months = salaryData.length;
   var avgIncome = totalIncome / months;
@@ -1124,7 +1152,15 @@ var neonBarPlugin = {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:14,font:{size:11}}},tooltip:darkTooltip()},
+      plugins: {legend:{labels:{color:'#8b95a5',usePointStyle:true,padding:14,font:{size:11}}},
+        tooltip: Object.assign(darkTooltip(), {callbacks:{
+          afterBody: function(items) {
+            var y = items[0].label.replace('年','') * 1;
+            var b = bonusByYear(y);
+            return b.count ? '其中奖金 ' + b.count + ' 笔，共 ¥' + fmt(Math.round(b.gross)) : '';
+          }
+        }})
+      },
       scales: {x:{ticks:{color:'#8b95a5',font:{size:12,weight:'bold'}},grid:{display:false}},y:yAxis()}
     },
     plugins: [neonBarPlugin]
@@ -1271,11 +1307,11 @@ var neonBarPlugin = {
 (function() {
   var ctx = document.getElementById('chartIncomeDonut');
   if (!ctx) return;
-  var labels = ['基本工资','补贴津贴','加班费','绩效奖','销售奖金','职级奖','调整项'];
-  var colors = ['#60a5fa','#38bdf8','#a78bfa','#22c55e','#f59e0b','#818cf8','#c084fc'];
+  var labels = ['基本工资','补贴津贴','加班费','绩效奖','销售奖金','职级奖','调整项','半年/年度奖金'];
+  var colors = ['#60a5fa','#38bdf8','#a78bfa','#22c55e','#f59e0b','#818cf8','#c084fc','#fbbf24'];
   var raw = [precomputed.comp_income[0], precomputed.comp_income[5], precomputed.comp_income[4],
              precomputed.comp_income[2], precomputed.comp_income[3], precomputed.comp_income[1],
-             precomputed.comp_income[6]];
+             precomputed.comp_income[6], precomputed.comp_income[7] || 0];
   var total = raw.reduce(function(a,b){return a+b;},0);
   var c = new Chart(ctx, {
     type: 'bar',
@@ -1404,7 +1440,8 @@ var neonBarPlugin = {
         {label:'销售奖金',data:comps.map(function(c){return c.saleBonus;}),backgroundColor:'rgba(245,158,11,0.75)',borderRadius:3},
         {label:'加班费',data:comps.map(function(c){return c.overtime;}),backgroundColor:'rgba(167,139,250,0.75)',borderRadius:3},
         {label:'补贴津贴',data:comps.map(function(c){return c.allowance;}),backgroundColor:'rgba(56,189,248,0.75)',borderRadius:3},
-        {label:'调整项',data:comps.map(function(c){return c.adjustment;}),backgroundColor:'rgba(192,132,252,0.75)',borderRadius:3}
+        {label:'调整项',data:comps.map(function(c){return c.adjustment;}),backgroundColor:'rgba(192,132,252,0.75)',borderRadius:3},
+        {label:'半年/年度奖金',data:yrs.map(function(y){return bonusByYear(y).gross;}),backgroundColor:'rgba(251,191,36,0.75)',borderRadius:3}
       ]
     },
     options: {
@@ -1633,6 +1670,7 @@ function computeYearlyData(y) {
   var items = salaryData.filter(function(d) { return d.y === y; });
   var n = items.length || 1;
   var sum = function(key) { return items.reduce(function(s,d){return s+(d[key]||0);},0); };
+  var b = bonusByYear(y);
   return {
     months: n,
     foundation:   sum('foundation'),
@@ -1645,14 +1683,18 @@ function computeYearlyData(y) {
     refreshment:  sum('refreshment'),
     travel:       sum('travel'),
     adjustment:   sum('adjustment'),
-    totalIncome:  sum('totalIncome'),
-    iit:          sum('iit'),
+    totalIncome:  sum('totalIncome') + b.gross,
+    iit:          sum('iit') + b.tax,
     pension:      sum('pension'),
     medical:      sum('medical'),
     unemployment: sum('unemployment'),
     housingFund:  sum('housingFund'),
-    totalDeduction:sum('totalDeduction'),
-    netPay:       sum('netPay')
+    totalDeduction:sum('totalDeduction') + b.tax,
+    netPay:       sum('netPay') + b.net,
+    bonusCount:   b.count,
+    bonusGross:   b.gross,
+    bonusTax:     b.tax,
+    bonusNet:     b.net
   };
 }
 
@@ -1690,8 +1732,22 @@ function switchYearNum(year, el) {
     '</div>';
   }).join('');
 
+  // Bonus row (半年/年度奖金，独立于月度)
+  var bonusHTML = '';
+  if (d.bonusCount > 0) {
+    bonusHTML = '<div class="data-row">' +
+      '<span class="data-label" style="color:#fbbf24;">半年/年度奖金</span>' +
+      '<div class="data-vals">' +
+        '<span class="data-avg">' + d.bonusCount + ' 笔，含税 ¥' + fmt(Math.round(d.bonusTax)) + '</span>' +
+        '<span class="data-val" style="color:#fbbf24;">¥' + fmt(Math.round(d.bonusGross)) + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  incomeHTML += bonusHTML;
+
   incomeHTML += '<div class="data-row total">' +
-    '<span class="data-label" style="font-weight:700;color:var(--accent);">总收入</span>' +
+    '<span class="data-label" style="font-weight:700;color:var(--accent);">总收入' + (d.bonusCount ? '（含奖金）' : '') + '</span>' +
     '<div class="data-vals">' +
       '<span class="data-avg">月均 ¥' + fmt(d.totalIncome/n) + '</span>' +
       '<span class="data-val" style="color:var(--accent);">¥' + fmt(d.totalIncome) + '</span>' +
@@ -1727,7 +1783,7 @@ function switchYearNum(year, el) {
   '</div>';
 
   dedHTML += '<div class="data-row total" style="margin-top:10px;background:rgba(34,197,94,0.04);border-radius:8px;padding:10px 12px;">' +
-    '<span class="data-label" style="font-weight:700;color:var(--green);">实发金额</span>' +
+    '<span class="data-label" style="font-weight:700;color:var(--green);">实发金额' + (d.bonusCount ? '（含奖金）' : '') + '</span>' +
     '<div class="data-vals">' +
       '<span class="data-avg">月均 ¥' + fmt(d.netPay/n) + '</span>' +
       '<span class="data-val" style="color:var(--green);font-size:16px;">¥' + fmt(d.netPay) + '</span>' +
@@ -1745,11 +1801,37 @@ function switchYearNum(year, el) {
     '</div>';
 }
 
+// === BONUS LEDGER TABLE ===
+function renderBonusTable() {
+  var tbody = document.getElementById('bonusTableBody');
+  if (!tbody) return;
+  var totalGross = 0, totalTax = 0, totalNet = 0;
+  var html = bonuses.slice().sort(function(a,b){ return (a.y*100+a.m)-(b.y*100+b.m); }).map(function(b) {
+    totalGross += b.gross; totalTax += b.tax; totalNet += b.net;
+    return '<tr>' +
+      '<td>' + b.y + '.' + p(b.m) + '</td>' +
+      '<td><span style="color:#fbbf24;font-weight:600;">' + b.type + '</span></td>' +
+      '<td>¥' + fmt(b.gross) + '</td>' +
+      '<td>' + (b.tax ? '¥' + fmt(b.tax) : '并入当月个税') + '</td>' +
+      '<td style="color:var(--green);font-weight:600;">¥' + fmt(b.net) + '</td>' +
+      '<td style="color:var(--text-secondary);font-size:12px;">' + (b.note || '') + '</td>' +
+    '</tr>';
+  }).join('');
+  html += '<tr style="border-top:1px solid rgba(255,255,255,0.12);font-weight:700;">' +
+    '<td>合计</td><td>' + bonuses.length + ' 笔</td>' +
+    '<td>¥' + fmt(Math.round(totalGross)) + '</td>' +
+    '<td>¥' + fmt(Math.round(totalTax)) + '</td>' +
+    '<td style="color:var(--green);">¥' + fmt(Math.round(totalNet)) + '</td><td></td>' +
+  '</tr>';
+  tbody.innerHTML = html;
+}
+
 // Initialize with 2023 data
 (function() {
   if (document.getElementById('yearDataGrid')) {
     switchYearNum(2023, document.querySelector('.yr-pill.active'));
   }
+  renderBonusTable();
 })();
 
 // === TABLE ===
@@ -1980,6 +2062,7 @@ function showEditorToast(msg, type) {
 // Expose data and functions to global scope for HTML onclick handlers
 window.salaryData = salaryData;
 window.precomputed = precomputed;
+window.bonuses = bonuses;
 window.switchTab = switchTab;
 window.exportData = exportData;
 window.toggleFullscreen = toggleFullscreen;
