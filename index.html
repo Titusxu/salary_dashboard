@@ -403,11 +403,11 @@ tr:hover td{background:rgba(255,255,255,0.03);}
 
   <div class="editor-row">
     <div class="editor-field"><label>基本工资</label><input type="number" id="edFoundation" value="13250" step="0.01" onchange="calcEditor()"></div>
-    <div class="editor-field"><label>职级奖</label><input type="number" id="edRankBonus" value="0" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>职级调整</label><input type="number" id="edRankBonus" value="0" step="0.01" onchange="calcEditor()"></div>
   </div>
   <div class="editor-row">
     <div class="editor-field"><label>绩效奖</label><input type="number" id="edPerfBonus" value="4651" step="0.01" onchange="calcEditor()"></div>
-    <div class="editor-field"><label>销售奖金</label><input type="number" id="edSaleBonus" value="0" step="0.01" onchange="calcEditor()"></div>
+    <div class="editor-field"><label>月度奖金</label><input type="number" id="edSaleBonus" value="0" step="0.01" onchange="calcEditor()"></div>
   </div>
   <div class="editor-row">
     <div class="editor-field"><label>加班费</label><input type="number" id="edOvertime" value="0" step="0.01" onchange="calcEditor()"></div>
@@ -645,7 +645,7 @@ tr:hover td{background:rgba(255,255,255,0.03);}
         <thead>
           <tr>
             <th>期间</th><th>职级</th>
-            <th>基本工资</th><th>职级奖</th><th>绩效奖</th><th>销售奖金</th>
+            <th>基本工资</th><th>职级调整</th><th>绩效奖</th><th>月度奖金</th>
             <th>加班费</th><th>补贴</th><th>调整</th><th>总收入</th>
             <th>个税</th><th>社保公积金</th><th>总扣除</th><th>实发金额</th><th>到手率</th>
           </tr>
@@ -885,7 +885,7 @@ function toggleFullscreen() {
 
 // === EXPORT ===
 function exportData() {
-  var csv = ['期间,职级,基本工资,职级奖,绩效奖,销售奖金,加班费,地区补贴,职务津贴,Refreshment,差旅费,调整项,总收入,个税,养老保险,医疗保险,失业保险,住房公积金,总扣除,实发金额'];
+  var csv = ['期间,职级,基本工资,职级调整,绩效奖,月度奖金,加班费,地区补贴,职务津贴,Refreshment,差旅费,调整项,总收入,个税,养老保险,医疗保险,失业保险,住房公积金,总扣除,实发金额'];
   salaryData.forEach(function(d) {
     csv.push([d.y+'.'+p(d.m),d.level,d.foundation,d.rankBonus,d.perfBonus,d.saleBonus,d.overtime,d.areaAllowance,d.dutyAllowance,d.refreshment,d.travel,d.adjustment,d.totalIncome,d.iit,d.pension,d.medical,d.unemployment,d.housingFund,d.totalDeduction,d.netPay].join(','));
   });
@@ -1307,7 +1307,7 @@ var neonBarPlugin = {
 (function() {
   var ctx = document.getElementById('chartIncomeDonut');
   if (!ctx) return;
-  var labels = ['基本工资','补贴津贴','加班费','绩效奖','销售奖金','职级奖','调整项','半年/年度奖金'];
+  var labels = ['基本工资','补贴津贴','加班费','绩效奖','月度奖金','职级调整','调整项','半年/年度奖金'];
   var colors = ['#60a5fa','#38bdf8','#a78bfa','#22c55e','#f59e0b','#818cf8','#c084fc','#fbbf24'];
   var raw = [precomputed.comp_income[0], precomputed.comp_income[5], precomputed.comp_income[4],
              precomputed.comp_income[2], precomputed.comp_income[3], precomputed.comp_income[1],
@@ -1435,9 +1435,9 @@ var neonBarPlugin = {
       labels: yrs.map(function(y) { return y + '年'; }),
       datasets: [
         {label:'基本工资',data:comps.map(function(c){return c.foundation;}),backgroundColor:'rgba(96,165,250,0.75)',borderRadius:3},
-        {label:'职级奖',data:comps.map(function(c){return c.rankBonus;}),backgroundColor:'rgba(129,140,248,0.75)',borderRadius:3},
+        {label:'职级调整',data:comps.map(function(c){return c.rankBonus;}),backgroundColor:'rgba(129,140,248,0.75)',borderRadius:3},
         {label:'绩效奖',data:comps.map(function(c){return c.perfBonus;}),backgroundColor:'rgba(34,197,94,0.75)',borderRadius:3},
-        {label:'销售奖金',data:comps.map(function(c){return c.saleBonus;}),backgroundColor:'rgba(245,158,11,0.75)',borderRadius:3},
+        {label:'月度奖金',data:comps.map(function(c){return c.saleBonus;}),backgroundColor:'rgba(245,158,11,0.75)',borderRadius:3},
         {label:'加班费',data:comps.map(function(c){return c.overtime;}),backgroundColor:'rgba(167,139,250,0.75)',borderRadius:3},
         {label:'补贴津贴',data:comps.map(function(c){return c.allowance;}),backgroundColor:'rgba(56,189,248,0.75)',borderRadius:3},
         {label:'调整项',data:comps.map(function(c){return c.adjustment;}),backgroundColor:'rgba(192,132,252,0.75)',borderRadius:3},
@@ -1710,9 +1710,9 @@ function switchYearNum(year, el) {
   // Income rows
   var incomeRows = [
     {label:'基本工资',    key:'foundation',    tag:''},
-    {label:'职级奖',      key:'rankBonus',     tag:''},
+    {label:'职级调整',      key:'rankBonus',     tag:''},
     {label:'绩效奖',      key:'perfBonus',     tag:''},
-    {label:'销售奖金',    key:'saleBonus',     tag:''},
+    {label:'月度奖金',    key:'saleBonus',     tag:''},
     {label:'加班费',      key:'overtime',      tag:''},
     {label:'地区补贴',    key:'areaAllowance', tag:''},
     {label:'职务津贴',    key:'dutyAllowance', tag:''},
